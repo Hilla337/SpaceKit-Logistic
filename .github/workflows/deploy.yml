@@ -50,6 +50,10 @@ jobs:
           YC_SA_KEY: ${{ secrets.YC_SA_KEY }}
         run: |
           printf '%s' "$YC_SA_KEY" > "$RUNNER_TEMP/key.json"
+          if ! jq -e '.id and .service_account_id and .private_key' "$RUNNER_TEMP/key.json" >/dev/null 2>&1; then
+            echo "::error::YC_SA_KEY должен быть JSON-файлом авторизованного ключа целиком (начинается с { и содержит id, service_account_id, private_key). В консоли при создании ключа нажми «Скачать файл с ключами» и вставь содержимое этого файла."
+            exit 1
+          fi
           yc config set service-account-key "$RUNNER_TEMP/key.json"
           yc config set folder-id "$FOLDER"
           SA=$(jq -r .service_account_id "$RUNNER_TEMP/key.json")
