@@ -132,38 +132,44 @@ function demoInit() {
     if (method === 'createForumTopic') return { message_thread_id: Math.floor(Math.random() * 1000) };
     return { message_id: log.length };
   } };
-  var core = new SKCore.Core(SKCore.MemoryStore(), tg, Date.now, {});
+  var core = new SKCore.Core(SKCore.MemoryStore(), tg, Date.now, {
+    botUsername: 'SpaceKitLogisticBot',
+    archive: async function (fileId, base) { return base + (/video/.test(base) ? '.mp4' : '.jpg'); }
+  });
   demo = { core: core, seeded: seed(core) };
 }
 async function seed(core) {
-  var now = Date.now();
   await core.session({ id: '1', name: 'Володя' });
-  var cs = [['2', 'Заир', 'Isuzu · 3 т'], ['3', 'Толя', 'Газель · 1,5 т'], ['4', 'Саша', 'Валдай · 2 т']];
+  var cs = [['2', 'Заир', 'Isuzu · 3 т', 'А 123 ВС 777', '+7 916 000-00-02'], ['3', 'Толя', 'Газель · 1,5 т', 'М 456 КР 750', '+7 916 000-00-03'], ['4', 'Саша', 'Валдай · 2 т', '', '']];
   for (var i = 0; i < cs.length; i++) {
     await core.session({ id: cs[i][0], name: cs[i][1] });
     await core.setRole('1', cs[i][0], 'courier');
-    await core.updateCourier({ role: 'admin' }, cs[i][0], { vehicle: cs[i][2] });
+    await core.updateCourier({ role: 'admin' }, cs[i][0], { vehicle: cs[i][2], plate: cs[i][3], phone: cs[i][4] });
   }
   await core.session({ id: '5', name: 'Стас', username: 'stas_zakup' });
   var v = await core.user('1');
-  var mk = function (t, a, it, w) { return core.createOrder(v, { title: t, address: a, items: it, window: w || '' }); };
-  var a1 = await mk('Дом, Опалиха', 'Красногорск, мкр. Опалиха, ул. Ольховая, 12', 'Профнастил С8 — 24 листа', 'до 12:00');
-  var a2 = await mk('Таунхаус, Строгино', 'Москва, ул. Кулакова, 20', 'Кладочная сетка — 12 шт', '11:00–13:00');
-  var a3 = await mk('ЖК «Изумрудные холмы»', 'Красногорск, ул. Заречная, 4', 'Клей плиточный Ceresit CM11 — 20 мешков', '');
+  var mk = function (n, t, a, it, w) { return core.createOrder(v, { num: n, title: t, address: a, items: it, window: w || '' }); };
+  var a1 = await mk('1031', 'Дом, Опалиха', 'Красногорск, мкр. Опалиха, ул. Ольховая, 12', 'Профнастил С8 — 24 листа', 'до 12:00');
+  var a2 = await mk('1034', 'Таунхаус, Строгино', 'Москва, ул. Кулакова, 20', 'Кладочная сетка — 12 шт', '11:00–13:00');
+  var a3 = await mk('1036', 'ЖК «Изумрудные холмы»', 'Красногорск, ул. Заречная, 4', 'Клей плиточный Ceresit CM11 — 20 мешков', '');
+  // заказчик таунхауса в Строгино подписан на объект
+  var pr = await core.s.get('project:' + a2.projectId);
+  await core.onUpdate({ message: { message_id: 1, from: { id: 900, first_name: 'Игорь' }, chat: { id: 900, type: 'private' }, text: '/start c_' + pr.token } });
   await core.assign(v, a1.id, '2'); await core.assign(v, a2.id, '2'); await core.assign(v, a3.id, '2');
   await core.sendTrip(v, '2');
-  var b1 = await mk('Офис, Сколково', 'Сколково, Большой бульвар, 42', 'Краска Tikkurila — 10 вёдер');
+  var b1 = await mk('1040', 'Офис, Сколково', 'Сколково, Большой бульвар, 42', 'Краска Tikkurila — 10 вёдер');
   await core.assign(v, b1.id, '3');
-  var b2 = await mk('ЖК «Солнцево Парк»', 'Москва, ул. Производственная, 8', 'Ламинат 32 класс — 18 уп.\nПодложка — 3 рулона');
+  var b2 = await mk('1042', 'ЖК «Солнцево Парк»', 'Москва, ул. Производственная, 8', 'Ламинат 32 класс — 18 уп.\nПодложка — 3 рулона');
   await core.assign(v, b2.id, '3');
-  await mk('Ремонт, Раменки', 'Москва, Мичуринский пр., 9', 'Гипсокартон — 30 листов', '');
-  await mk('ЖК «Левобережный»', 'Химки, ул. Молодёжная, 70', 'Ламинат 33 класс — 28 упаковок', '14:00–17:00');
-  await mk('Квартира, Крылатское', 'Москва, Осенний б-р, 7к2', 'Штукатурка Ротбанд — 30 мешков', '');
+  await mk('1047', 'Квартира, Крылатское', 'Москва, Осенний б-р, 7к2', 'Штукатурка Ротбанд — 30 мешков', '');
+  await mk('1048', 'ЖК «Левобережный»', 'Химки, ул. Молодёжная, 70', 'Ламинат 33 класс — 28 упаковок', '14:00–17:00');
+  await mk('1049', 'Ремонт, Раменки', 'Москва, Мичуринский пр., 9', 'Гипсокартон — 30 листов', '');
   // Заир уже закрыл первую точку
   await core.reportStart(await core.user('2'), a1.id);
   await core.onUpdate({ message: { message_id: 1, from: { id: 2 }, chat: { id: 2, type: 'private' }, photo: [{}] } });
   await core.onUpdate({ message: { message_id: 2, from: { id: 2 }, chat: { id: 2, type: 'private' }, video: {} } });
-  S.botLog.length = 0;
+  var keep = S.botLog.filter(function (m) { return m.to === '900'; });
+  S.botLog.length = 0; keep.forEach(function (m) { S.botLog.push(m); });
 }
 
 async function api(op, body) {
@@ -183,6 +189,7 @@ async function api(op, body) {
 }
 
 async function load(quiet) {
+  if (DEMO && S.demoAs === 'client') { await demo.seeded; renderDemoBar(); return renderClient(); }
   try {
     var st = await api('state');
     S.data = st;
@@ -218,6 +225,7 @@ function avatar(c, size) {
   if (!c) return '';
   return '<span class="dot" style="background:' + c.color + (size ? ';width:' + size + 'px;height:' + size + 'px;font-size:' + Math.round(size / 2.2) + 'px' : '') + '">' + e((c.name || '?')[0]) + '</span>';
 }
+function carText(c) { return e([c.vehicle || 'машина не указана', c.plate].filter(Boolean).join(' · ')) + (c.plate ? '' : ' · <span style="color:#fcd27b">нет госномера</span>'); }
 function goods(o) { return '<div class="goods">' + o.items.map(function (x) { return '<div>' + e(x) + '</div>'; }).join('') + '</div>'; }
 function ordersOf(trip) { return trip.orderIds.map(function (id) { return byId(S.data.orders, id); }).filter(Boolean); }
 function bar(list) {
@@ -247,7 +255,7 @@ function render() {
 
 function renderDemoBar() {
   if (!DEMO) return;
-  var who = [['1', 'Володя · склад'], ['2', 'Заир'], ['3', 'Толя'], ['4', 'Саша']];
+  var who = [['1', 'Володя · склад'], ['2', 'Заир'], ['3', 'Толя'], ['4', 'Саша'], ['client', 'Заказчик']];
   $('demobar').innerHTML = '<div class="demo"><b>Демо</b>' + who.map(function (w) {
     return '<button class="chip' + (S.demoAs === w[0] ? ' on' : '') + '" onclick="demoAs(\'' + w[0] + '\')">' + e(w[1]) + '</button>';
   }).join('') + '</div>';
@@ -286,7 +294,7 @@ function adminOrders() {
     var c = p && p.courierId ? byId(d.couriers, p.courierId) : null;
     h += '<div class="card"><div class="row"><div class="sp"><div class="t">' + e(o.title) + '</div><div class="s">' + e(o.address) + '</div></div>' +
       '<div class="xs" style="text-align:right">№' + e(o.num) + '<br>' + hhmm(o.createdAt) + '</div></div>' + goods(o) +
-      (o.window ? '<div class="xs" style="margin-top:8px">Окно клиента: ' + e(o.window) + '</div>' : '') +
+      '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">' + clientTag(o) + (o.window ? '<span class="tag">окно: ' + e(o.window) + '</span>' : '') + '</div>' +
       '<div class="btns">' + (c
         ? '<button class="btn ok" onclick="act(\'assign\',{orderId:\'' + o.id + '\',courierId:\'' + c.id + '\'},\'В рейс: ' + e(c.name) + '\')">' + avatar(c) + ' В рейс ' + e(c.name) + '</button><button class="btn sm" style="flex:0 0 auto" onclick="pickCourier(\'' + o.id + '\')">Другой</button>'
         : '<button class="btn pri" onclick="pickCourier(\'' + o.id + '\')">Новый объект — выбрать курьера</button>') +
@@ -303,7 +311,7 @@ function adminCouriers() {
   d.couriers.forEach(function (c) {
     var active = d.trips.filter(function (t) { return t.courierId === c.id && t.status === 'sent'; })[0];
     var forming = d.trips.filter(function (t) { return t.courierId === c.id && t.status === 'forming'; })[0];
-    h += '<div class="card' + (active ? ' active' : '') + '"><div class="row">' + avatar(c, 34) + '<div class="sp"><div class="t">' + e(c.name) + '</div><div class="s">' + e(c.vehicle || 'машина не указана') + '</div></div>';
+    h += '<div class="card' + (active ? ' active' : '') + '"><div class="row">' + avatar(c, 34) + '<div class="sp"><div class="t">' + e(c.name) + '</div><div class="s">' + carText(c) + '</div></div>';
     if (active) {
       var ao = ordersOf(active), done = ao.filter(function (o) { return o.status !== 'active'; }).length;
       var cur = ao.filter(function (o) { return o.status === 'active'; })[0];
@@ -316,7 +324,7 @@ function adminCouriers() {
     if (forming) {
       var fo = ordersOf(forming);
       h += '<div style="margin-top:6px">' + fo.map(function (o, i) {
-        return '<div class="stop"><span class="num">' + (i + 1) + '</span><div class="sp"><div style="font-weight:600">' + e(o.title) + '</div><div class="xs">' + e(o.items.join(', ')) + '</div></div>' +
+        return '<div class="stop"><span class="num">' + (i + 1) + '</span><div class="sp"><div style="font-weight:600">' + e(o.title) + ' <span class="xs">№' + e(o.num) + '</span></div><div class="xs">' + e(o.items.join(', ')) + '</div></div>' +
           '<div class="mv"><button onclick="act(\'move\',{orderId:\'' + o.id + '\',dir:-1})" ' + (i ? '' : 'disabled') + '>▲</button><button onclick="act(\'move\',{orderId:\'' + o.id + '\',dir:1})" ' + (i < fo.length - 1 ? '' : 'disabled') + '>▼</button></div>' +
           '<button class="btn sm" onclick="act(\'unqueue\',{orderId:\'' + o.id + '\'},\'Вернул в новые\')" title="Убрать">✕</button></div>';
       }).join('') + '</div>';
@@ -333,7 +341,7 @@ function stopRow(o) {
     : o.status === 'problem' ? '<span class="tag bad">проблема</span>'
     : o.report && (o.report.photos || o.report.videos) ? '<span class="tag warn">отчёт: ' + (o.report.photos ? 'фото ✓' : 'фото —') + ' ' + (o.report.videos ? 'видео ✓' : 'видео —') + '</span>' : '';
   var cls = o.status === 'delivered' ? 'ok' : o.status === 'problem' ? 'bad' : '';
-  return '<div class="stop"><span class="num ' + cls + '">' + (o.seq || '') + '</span><div class="sp"><div style="font-weight:600">' + e(o.title) + '</div><div class="xs">' + e(o.address) + '</div>' +
+  return '<div class="stop"><span class="num ' + cls + '">' + (o.seq || '') + '</span><div class="sp"><div style="font-weight:600">' + e(o.title) + ' <span class="xs">№' + e(o.num) + '</span></div><div class="xs">' + e(o.address) + '</div>' +
     (o.problem ? '<div class="xs" style="color:#fca5a5">' + e(o.problem.text) + (o.problem.comment ? ' — «' + e(o.problem.comment) + '»' : '') + '</div>' : '') + '</div>' + st + '</div>';
 }
 function sendTrip(cid) {
@@ -342,7 +350,7 @@ function sendTrip(cid) {
   if (!t) return;
   var fo = ordersOf(t);
   sheet('<h3>Отправить рейс ' + e(c.name) + '?</h3><div class="s" style="margin-bottom:10px">Курьер получит список в боте. Порядок объезда:</div>' +
-    fo.map(function (o, i) { return '<div class="stop"><span class="num">' + (i + 1) + '</span><div class="sp"><b>' + e(o.title) + '</b><div class="xs">' + e(o.address) + '</div></div></div>'; }).join('') +
+    fo.map(function (o, i) { return '<div class="stop"><span class="num">' + (i + 1) + '</span><div class="sp"><b>' + e(o.title) + '</b> <span class="xs">№' + e(o.num) + '</span><div class="xs">' + e(o.address) + '</div></div></div>'; }).join('') +
     '<div class="s" style="margin:12px 0 6px">Порядок погрузки (первым — в глубину кузова):</div>' +
     fo.slice().reverse().map(function (o, i) { return '<div class="xs">' + (i + 1) + '. ' + e(o.title) + ': ' + e(o.items.join(', ')) + '</div>'; }).join('') +
     '<div class="btns"><button class="btn" onclick="closeSheet()">Отмена</button><button class="btn pri" onclick="act(\'sendTrip\',{courierId:\'' + cid + '\'},\'Рейс отправлен\')">Отправить</button></div>');
@@ -389,24 +397,59 @@ function adminPeople() {
   h += '<h2>Курьеры</h2>';
   if (!d.couriers.length) h += '<div class="card empty">Пока никого. Курьер открывает бота → /start, запрос появится здесь.</div>';
   d.couriers.forEach(function (c) {
-    h += '<div class="card"><div class="row">' + avatar(c, 30) + '<div class="sp"><div style="font-weight:700">' + e(c.name) + '</div><div class="xs">' + e(c.vehicle || 'машина не указана') + '</div></div>' +
+    h += '<div class="card"><div class="row">' + avatar(c, 30) + '<div class="sp"><div style="font-weight:700">' + e(c.name) + '</div><div class="xs">' + carText(c) + '</div></div>' +
       '<button class="btn sm" onclick="editCourier(\'' + c.id + '\')">Изменить</button></div></div>';
   });
   var pr = d.projects.filter(function (p) { return p.courierId; });
   if (pr.length) {
-    h += '<h2>Закрепления за объектами</h2><div class="card">' + pr.map(function (p) {
+    h += '<h2>Объекты · курьер и заказчик</h2><div class="card">' + pr.map(function (p) {
       var c = byId(d.couriers, p.courierId);
-      return '<div class="stop">' + avatar(c) + '<div class="sp"><div style="font-weight:600">' + e(p.name) + '</div><div class="xs">' + e(p.address) + '</div></div><span class="xs">' + e(c ? c.name : '') + '</span></div>';
+      return '<div class="stop">' + avatar(c) + '<div class="sp"><div style="font-weight:600">' + e(p.name) + '</div><div class="xs">' + e(p.address) + '</div><div style="margin-top:5px">' + clientTag({ projectId: p.id }) + '</div></div><span class="xs">' + e(c ? c.name : '') + '</span></div>';
     }).join('') + '</div>';
   }
   return h;
 }
+function carFields(c) {
+  return '<div class="field"><label>Машина</label><input id="cv" value="' + e(c.vehicle) + '" placeholder="Газель · 1,5 т"></div>' +
+    '<div class="row" style="gap:8px"><div class="field sp"><label>Госномер</label><input id="cp" value="' + e(c.plate) + '" placeholder="А 123 ВС 777" style="text-transform:uppercase"></div>' +
+    '<div class="field sp"><label>Телефон водителя</label><input id="ch" value="' + e(c.phone) + '" inputmode="tel" placeholder="+7 916 …"></div></div>' +
+    '<div class="xs" style="margin:-2px 2px 10px">Госномер и телефон уходят заказчику — по ним он сам заказывает пропуск. Если машина поменялась, заказчики текущих заявок получат обновление.</div>';
+}
 function editCourier(id) {
   var c = byId(S.data.couriers, id);
-  sheet('<h3>' + e(c.name) + '</h3><div class="field"><label>Имя</label><input id="cn" value="' + e(c.name) + '"></div>' +
-    '<div class="field"><label>Машина</label><input id="cv" value="' + e(c.vehicle) + '" placeholder="Газель · 1,5 т"></div>' +
+  sheet('<h3>' + e(c.name) + '</h3><div class="field"><label>Имя</label><input id="cn" value="' + e(c.name) + '"></div>' + carFields(c) +
     '<div class="btns"><button class="btn bad" onclick="if(confirmRemove())act(\'setRole\',{id:\'' + id + '\',role:\'remove\'},\'Доступ убран\')">Убрать доступ</button>' +
-    '<button class="btn pri" onclick="act(\'updateCourier\',{id:\'' + id + '\',name:$(\'cn\').value,vehicle:$(\'cv\').value},\'Сохранено\')">Сохранить</button></div>');
+    '<button class="btn pri" onclick="act(\'updateCourier\',{id:\'' + id + '\',name:$(\'cn\').value,vehicle:$(\'cv\').value,plate:$(\'cp\').value,phone:$(\'ch\').value},\'Сохранено\')">Сохранить</button></div>');
+}
+function editMyCar() {
+  var c = S.data.me;
+  sheet('<h3>Моя машина сегодня</h3>' + carFields(c) +
+    '<div class="btns"><button class="btn" onclick="closeSheet()">Отмена</button><button class="btn pri" onclick="act(\'myCar\',{vehicle:$(\'cv\').value,plate:$(\'cp\').value,phone:$(\'ch\').value},\'Сохранено\')">Сохранить</button></div>');
+}
+function clientLink(p) { return 'https://t.me/' + (S.data.bot || 'bot') + '?start=c_' + p.token; }
+function clientShare(pid) {
+  var p = byId(S.data.projects, pid);
+  var link = clientLink(p);
+  var text = 'Здравствуйте! Это SpaceKit. Подключитесь к уведомлениям о доставках по объекту «' + p.name + '»: пришлём машину и госномер для пропуска, а после выгрузки — фото и видео.';
+  sheet('<h3>Заказчик · ' + e(p.name) + '</h3>' +
+    '<div class="s">' + (p.clients ? '✅ Подключено: ' + p.clients + ' ' + plural(p.clients, 'чат', 'чата', 'чатов') + '. Данные для пропуска и отчёты уходят им сами.' : 'Заказчик ещё не подключён. Отправь ему ссылку один раз — дальше пропуска и отчёты без участия склада.') + '</div>' +
+    '<div class="goods" style="word-break:break-all;user-select:all">' + e(link) + '</div>' +
+    '<div class="xs" style="margin-top:6px">Ссылку можно отправить в личку заказчику или в общий чат по объекту — подключится весь чат.</div>' +
+    '<div class="btns"><button class="btn" onclick="copyText(\'' + link + '\')">Скопировать</button>' +
+    '<button class="btn pri" onclick="shareTg(\'' + encodeURIComponent(link) + '\',\'' + encodeURIComponent(text) + '\')">Отправить в Telegram</button></div>');
+}
+function copyText(t) {
+  try { navigator.clipboard.writeText(t).then(function () { toast('Скопировано'); }, function () { toast('Выдели ссылку и скопируй вручную', true); }); }
+  catch (x) { toast('Выдели ссылку и скопируй вручную', true); }
+}
+function shareTg(link, text) {
+  var u = 'https://t.me/share/url?url=' + link + '&text=' + text;
+  if (TG && TG.openTelegramLink) TG.openTelegramLink(u); else if (DEMO) toast('В Telegram откроется выбор чата для отправки'); else window.open(u, '_blank');
+}
+function clientTag(o) {
+  var p = byId(S.data.projects, o.projectId);
+  if (!p) return '';
+  return '<button class="tag ' + (p.clients ? 'ok' : 'warn') + '" onclick="clientShare(\'' + p.id + '\')">' + (p.clients ? '👤 заказчик подключён' : '👤 заказчик не подключён') + '</button>';
 }
 function confirmRemove() { return window.__rm ? true : (window.__rm = true, toast('Нажми ещё раз, чтобы убрать доступ'), setTimeout(function () { window.__rm = false; }, 3000), false); }
 
@@ -414,12 +457,12 @@ function newOrder(pre) {
   pre = pre || {};
   var known = S.data.projects.slice().sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
   sheet('<h3>Новая заявка</h3>' +
+    '<div class="field"><label>№ заявки</label><input id="fn" inputmode="numeric" placeholder="1050" value="' + e(pre.num) + '"></div>' +
     '<div class="field"><label>Объект</label><input id="ft" list="plist" value="' + e(pre.title) + '" placeholder="ЖК «Левобережный»" oninput="fillAddr()"><datalist id="plist">' +
     known.map(function (p) { return '<option value="' + e(p.name) + '">'; }).join('') + '</datalist></div>' +
     '<div class="field"><label>Адрес</label><input id="fa" value="' + e(pre.address) + '" placeholder="Химки, ул. Молодёжная, 70"></div>' +
     '<div class="field"><label>Груз — каждая позиция с новой строки</label><textarea id="fi" placeholder="Ламинат 33 класс — 28 уп.">' + e(pre.items) + '</textarea></div>' +
-    '<div class="row" style="gap:8px"><div class="field sp"><label>Окно клиента</label><input id="fw" value="' + e(pre.window) + '" placeholder="до 14:00"></div>' +
-    '<div class="field sp"><label>№ заказа</label><input id="fn" placeholder="авто"></div></div>' +
+    '<div class="field"><label>Окно клиента</label><input id="fw" value="' + e(pre.window) + '" placeholder="до 14:00"></div>' +
     '<div class="field"><label>Комментарий</label><input id="fc" value="' + e(pre.note) + '" placeholder="звонить прорабу Сергею"></div>' +
     '<div class="btns"><button class="btn" onclick="closeSheet()">Отмена</button><button class="btn pri" onclick="saveOrder()">Добавить</button></div>');
 }
@@ -449,7 +492,8 @@ function renderCourier() {
   $('nav').hidden = true;
   var active = d.trips.filter(function (t) { return t.status === 'sent'; })[0];
   var forming = d.trips.filter(function (t) { return t.status === 'forming'; })[0];
-  var h = '';
+  var me = d.me;
+  var h = '<div class="card" style="margin-top:6px"><div class="row">' + avatar(me, 30) + '<div class="sp"><div class="xs">Моя машина</div><div style="font-weight:600">' + carText(me) + '</div></div><button class="btn sm" onclick="editMyCar()">Изменить</button></div></div>';
   if (!active) {
     h += '<div class="hero" style="margin-top:6px"><div class="t">Рейса нет</div><div class="s" style="margin-top:4px">Ждёшь на складе. Когда Володя отправит рейс, бот пришлёт уведомление.</div></div>';
   } else {
@@ -473,7 +517,7 @@ function renderCourier() {
     if (rest.length) {
       h += '<h2>Остальные точки</h2><div class="card">' + rest.map(function (o) {
         var lock = o.status === 'active';
-        return '<div class="stop"><span class="num ' + (o.status === 'delivered' ? 'ok' : o.status === 'problem' ? 'bad' : '') + '">' + o.seq + '</span><div class="sp"><div style="font-weight:600">' + e(o.title) + '</div><div class="xs">' +
+        return '<div class="stop"><span class="num ' + (o.status === 'delivered' ? 'ok' : o.status === 'problem' ? 'bad' : '') + '">' + o.seq + '</span><div class="sp"><div style="font-weight:600">' + e(o.title) + ' <span class="xs">№' + e(o.num) + '</span></div><div class="xs">' +
           (lock ? 'откроется после отчёта по точке ' + (cur ? cur.seq : '') : o.status === 'delivered' ? 'доставлено ' + hhmm(o.deliveredAt) : 'проблема: ' + e(o.problem && o.problem.text)) + '</div></div>' + (lock ? '🔒' : '') + '</div>';
       }).join('') + '</div>';
     }
@@ -524,6 +568,15 @@ function botChat() {
   return '<h2>Чат с ботом (демо)</h2><div class="chat">' + (mine.length ? mine.map(function (m) {
     return '<div class="m' + (m.me ? ' me' : '') + '">' + m.text.replace(/<\/?b>/g, '') + '</div>';
   }).join('') : '<div class="xs" style="padding:6px">Здесь видно, что бот пишет курьеру</div>') + '</div>';
+}
+
+function renderClient() {
+  $('nav').hidden = true;
+  $('who').innerHTML = 'Игорь<br>заказчик';
+  var mine = S.botLog.filter(function (m) { return m.to === '900'; });
+  $('app').innerHTML = '<div class="hero" style="margin-top:6px"><div class="t">Так видит заказчик</div><div class="s" style="margin-top:4px">Игорь, таунхаус в Строгино. Один раз открыл ссылку от SpaceKit — дальше бот сам присылает машину и госномер для пропуска, выезд и фото/видео выгрузки. Володя в этом не участвует.</div></div>' +
+    '<div class="chat">' + mine.map(function (m) { return '<div class="m">' + m.text.replace(/<\/?b>/g, '') + '</div>'; }).join('') + '</div>' +
+    '<div class="xs" style="margin-top:10px;text-align:center">Переключись на Заира, закрой точку «Таунхаус, Строгино» и вернись сюда — придут фото и видео.</div>';
 }
 
 // ---------- шторка ----------

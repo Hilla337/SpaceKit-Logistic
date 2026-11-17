@@ -71,6 +71,12 @@ jobs:
       - name: Хранилище для страницы
         run: |
           yc storage bucket get "$BUCKET" >/dev/null 2>&1 || yc storage bucket create --name "$BUCKET"
+          # отдельный приватный бакет — архив фото и видео отчётов (наружу не отдаётся)
+          ARCHIVE="$NAME-archive-$FOLDER"
+          yc storage bucket get "$ARCHIVE" >/dev/null 2>&1 || yc storage bucket create --name "$ARCHIVE"
+          echo "ARCHIVE_BUCKET=$ARCHIVE" >> "$GITHUB_ENV"
+          BOT=$(curl -fsS "https://api.telegram.org/bot$TG_BOT_TOKEN/getMe" | jq -r .result.username)
+          echo "BOT_USERNAME=$BOT" >> "$GITHUB_ENV"
 
       - name: Функция и шлюз
         run: |
@@ -101,7 +107,7 @@ jobs:
             --execution-timeout 30s \
             --service-account-id "$SA" \
             --source-path "$RUNNER_TEMP/fn.zip" \
-            --environment "YDB_ENDPOINT=$YDB_ENDPOINT,YDB_DATABASE=$YDB_DATABASE,APP_URL=$APP_URL,TG_BOT_TOKEN=$TG_BOT_TOKEN"
+            --environment "YDB_ENDPOINT=$YDB_ENDPOINT,YDB_DATABASE=$YDB_DATABASE,APP_URL=$APP_URL,TG_BOT_TOKEN=$TG_BOT_TOKEN,ARCHIVE_BUCKET=$ARCHIVE_BUCKET,BOT_USERNAME=$BOT_USERNAME"
 
       - name: Страница приложения
         run: |
@@ -132,7 +138,7 @@ jobs:
             -d "{\"menu_button\":{\"type\":\"web_app\",\"text\":\"Логистика\",\"web_app\":{\"url\":\"$APP_URL\"}}}" | jq -c '{ok,description}'
           curl -fsS "https://api.telegram.org/bot$TG_BOT_TOKEN/setMyCommands" \
             -H 'content-type: application/json' \
-            -d '{"commands":[{"command":"start","description":"Начать / запросить доступ"}]}' | jq -c '{ok}'
+            -d '{"commands":[{"command":"start","description":"Начать / запросить доступ"},{"command":"stop","description":"Отключить уведомления заказчика"}]}' | jq -c '{ok}'
 
       - name: Итог
         run: |

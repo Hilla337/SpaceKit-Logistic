@@ -145,7 +145,10 @@
     trips = trips.filter(function (t) { return t.status !== 'done' || (t.doneAt || 0) > weekAgo; });
     orders = orders.filter(function (o) { return o.status !== 'delivered' && o.status !== 'cancelled' || (o.closedAt || 0) > weekAgo; });
     var couriers = users.filter(function (x) { return x.role === 'courier'; }).map(function (c) {
-      return { id: c.id, name: c.name, vehicle: c.vehicle || '', color: c.color };
+      return { id: c.id, name: c.name, vehicle: c.vehicle || '', plate: c.plate || '', phone: c.phone || '', color: c.color };
+    });
+    projects = projects.map(function (p) {
+      return { id: p.id, name: p.name, address: p.address, courierId: p.courierId, token: p.token, clients: (p.clients || []).length, createdAt: p.createdAt };
     });
     var cfg = await this.cfg();
     if (u.role === 'admin') {
@@ -154,6 +157,7 @@
         orders: orders, trips: trips, projects: projects, couriers: couriers,
         pending: users.filter(function (x) { return x.role === 'pending'; }).map(function (x) { return { id: x.id, name: x.name, username: x.username }; }),
         reportsChat: !!cfg.reportsChatId,
+        bot: this.opts.botUsername || '',
         problems: PROBLEMS
       };
     }
@@ -162,7 +166,7 @@
       var ids = {};
       mine.forEach(function (t) { t.orderIds.forEach(function (id) { ids[id] = 1; }); });
       return {
-        me: { id: u.id, name: u.name, role: u.role, vehicle: u.vehicle || '', color: u.color },
+        me: { id: u.id, name: u.name, role: u.role, vehicle: u.vehicle || '', plate: u.plate || '', phone: u.phone || '', color: u.color },
         trips: mine,
         orders: orders.filter(function (o) { return ids[o.id]; }),
         problems: PROBLEMS
@@ -192,13 +196,95 @@
     var key = projectKey(name);
     var p = await this.s.get('project:' + key);
     if (!p) {
-      p = { id: key, name: clean(name, 120), address: clean(address, 200), courierId: null, topicId: null, createdAt: this.now() };
+      p = { id: key, name: clean(name, 120), address: clean(address, 200), courierId: null, topicId: null, token: this.newToken(), clients: [], createdAt: this.now() };
       await this.s.put('project:' + key, p);
-    } else if (address && !p.address) {
-      p.address = clean(address, 200);
+    } else if ((address && !p.address) || !p.token) {
+      if (address && !p.address) p.address = clean(address, 200);
+      if (!p.token) p.token = this.newToken();
       await this.s.put('project:' + key, p);
     }
     return p;
+  };
+
+  P.newToken = function () {
+    var s = '';
+    for (var i = 0; i < 3; i++) s += Math.random().toString(36).slice(2, 7);
+    return s;
+  };
+
+  // ---------- заказчики: пропуска и отчёты ----------
+
+  P.carLine = function (c) {
+    return [c.vehicle, c.plate ? 'госномер <b>' + esc(c.plate) + '</b>' : 'госномер не указан'].filter(Boolean).join(', ');
+  };
+
+  /** Сообщение всем подписанным заказчикам объекта */
+  P.toClients = async function (o, text, extra) {
+    var p = await this.s.get('project:' + o.projectId);
+    var list = (p && p.clients) || [];
+    for (var i = 0; i < list.length; i++) await this.send(list[i].id, text, extra);
+    return list.length;
+  };
+
+  /** Данные для пропуска: при постановке в рейс и при смене машины */
+  P.passInfo = async function (o, c, why) {
+    var stamp = c.id + '|' + (c.plate || '') + '|' + (c.vehicle || '');
+    if (o.passFor === stamp) return 0;
+    var head = why === 'changed' ? '🔄 <b>Машина изменилась</b>' : '🚚 <b>Доставка запланирована</b>';
+    var n = await this.toClients(o, head + '\nОбъект: ' + esc(o.title) + ' · заявка №' + esc(o.num) +
+      '\nГруз: ' + esc(o.items.join(', ')) +
+      '\n\nМашина: ' + this.carLine(c) +
+      '\nВодитель: ' + esc(c.name) + (c.phone ? ', ' + esc(c.phone) : '') +
+      (o.window ? '\nОкно: ' + esc(o.window) : '') +
+      '\n\nПожалуйста, закажите пропуск на въезд по этому госномеру. Когда машина выедет со склада — напишу.');
+    o.passFor = stamp;
+    await this.s.put('order:' + o.id, o);
+    return n;
+  };
+
+  /** Курьер сам меняет машину/госномер — заказчики его заявок получают обновление */
+  P.myCar = async function (u, d) {
+    if (!u || u.role !== 'courier') fail('Только для курьера', 403);
+    var c = await this.user(u.id);
+    if (d.vehicle != null) c.vehicle = clean(d.vehicle, 60);
+    if (d.plate != null) c.plate = clean(d.plate, 20).toUpperCase();
+    if (d.phone != null) c.phone = clean(d.phone, 30);
+    await this.s.put('user:' + c.id, c);
+    await this.refreshPasses(c);
+    return c;
+  };
+
+  P.refreshPasses = async function (c) {
+    var orders = await this.s.list('order:');
+    for (var i = 0; i < orders.length; i++) {
+      var o = orders[i];
+      if (o.courierId === c.id && (o.status === 'queued' || o.status === 'active') && o.passFor) await this.passInfo(o, c, 'changed');
+    }
+  };
+
+  /** /start c_<token> — заказчик подписывается на объект (в личке или в группе) */
+  P.subscribe = async function (chat, token, who) {
+    var projects = await this.s.list('project:');
+    var p = projects.filter(function (x) { return x.token && x.token === token; })[0];
+    if (!p) return this.send(chat.id, 'Ссылка устарела или неверная. Попросите менеджера SpaceKit прислать новую.');
+    p.clients = p.clients || [];
+    if (!p.clients.some(function (x) { return String(x.id) === String(chat.id); })) {
+      p.clients.push({ id: chat.id, name: chat.title || who, at: this.now() });
+      await this.s.put('project:' + p.id, p);
+      await this.notifyAdmins('🤝 Заказчик подключился к объекту <b>' + esc(p.name) + '</b>: ' + esc(chat.title || who));
+    }
+    return this.send(chat.id, '✅ Вы подключены к доставкам SpaceKit по объекту <b>' + esc(p.name) + '</b>.\n\nСюда будут приходить:\n• машина и госномер — чтобы заказать пропуск;\n• когда машина выехала;\n• фото и видео выгрузки.\n\nОтключиться: /stop');
+  };
+
+  P.unsubscribe = async function (chat) {
+    var projects = await this.s.list('project:');
+    var n = 0;
+    for (var i = 0; i < projects.length; i++) {
+      var p = projects[i], before = (p.clients || []).length;
+      p.clients = (p.clients || []).filter(function (x) { return String(x.id) !== String(chat.id); });
+      if (p.clients.length !== before) { n++; await this.s.put('project:' + p.id, p); }
+    }
+    return this.send(chat.id, n ? 'Отключено. Уведомления о доставках больше не придут.' : 'Подписок нет.');
   };
 
   P.createOrder = async function (u, d) {
@@ -206,13 +292,14 @@
     var title = clean(d.title, 120);
     var address = clean(d.address, 200);
     var items = (Array.isArray(d.items) ? d.items : String(d.items || '').split(/\n/)).map(function (x) { return clean(x, 160); }).filter(Boolean).slice(0, 40);
+    var num = clean(d.num, 20).replace(/^№\s*/, '');
+    if (!num) fail('Укажи № заявки');
     if (!title) fail('Укажи объект');
     if (!address) fail('Укажи адрес');
     if (!items.length) fail('Укажи груз');
+    var dup = (await this.s.list('order:')).filter(function (x) { return x.num === num && x.status !== 'cancelled'; })[0];
+    if (dup) fail('Заявка №' + num + ' уже есть: ' + dup.title);
     var p = await this.ensureProject(title, address);
-    var cfg = await this.cfg();
-    var num = d.num ? clean(d.num, 20) : String(cfg.nextNum || 1);
-    if (!d.num) { cfg.nextNum = (cfg.nextNum || 1) + 1; await this.s.put('cfg', cfg); }
     var o = {
       id: this.newId(), num: num, projectId: p.id, title: title, address: address, items: items,
       window: clean(d.window, 60), note: clean(d.note, 300), unload: !!d.unload,
@@ -256,6 +343,7 @@
     await this.s.put('order:' + o.id, o);
     var p = await this.s.get('project:' + o.projectId);
     if (p && p.courierId !== courierId) { p.courierId = courierId; await this.s.put('project:' + p.id, p); }
+    await this.passInfo(o, c, o.passFor ? 'changed' : 'planned');
     return { order: o, trip: t };
   };
 
@@ -292,6 +380,7 @@
     if (o.status !== 'new') fail('Отменить можно только заявку, которая ещё не в пути');
     o.status = 'cancelled'; o.closedAt = this.now();
     await this.s.put('order:' + o.id, o);
+    if (o.passFor) await this.toClients(o, '❌ Доставка по заявке №' + esc(o.num) + ' (' + esc(o.title) + ') отменена. Пропуск на эту машину больше не нужен — менеджер SpaceKit свяжется с вами.');
     return o;
   };
 
@@ -324,8 +413,13 @@
       orders[i].status = 'active'; orders[i].seq = i + 1;
       await this.s.put('order:' + orders[i].id, orders[i]);
     }
-    var lines = orders.map(function (o, i) { return (i + 1) + '. <b>' + esc(o.title) + '</b> — ' + esc(o.address); });
-    var load = orders.slice().reverse().map(function (o) { return '• ' + esc(o.title) + ': ' + esc(o.items.join(', ')); });
+    var lines = orders.map(function (o, i) { return (i + 1) + '. <b>' + esc(o.title) + '</b> · №' + esc(o.num) + '\n    ' + esc(o.address); });
+    var load = orders.slice().reverse().map(function (o) { return '• №' + esc(o.num) + ' ' + esc(o.title) + ': ' + esc(o.items.join(', ')); });
+    for (var k = 0; k < orders.length; k++) {
+      await this.toClients(orders[k], '🛣 <b>Машина выехала со склада</b>\nЗаявка №' + esc(orders[k].num) + ' · ' + esc(orders[k].title) +
+        '\nМашина: ' + this.carLine(c) + '\nВодитель: ' + esc(c.name) + (c.phone ? ', ' + esc(c.phone) : '') +
+        '\nВы — точка ' + (k + 1) + ' из ' + orders.length + ' в рейсе.');
+    }
     await this.send(courierId,
       '🚚 <b>Новый рейс · ' + orders.length + ' ' + plural(orders.length, 'точка', 'точки', 'точек') + '</b>\n\n' + lines.join('\n') +
       '\n\n📦 <b>Грузить в таком порядке</b> (первым — то, что выгружать последним):\n' + load.join('\n') +
@@ -437,20 +531,45 @@
       : (msg.document && /^image\//.test(msg.document.mime_type || '')) ? 'photos' : null;
     if (!kind) return;
     o.report = o.report || { photos: 0, videos: 0 };
+    var first = !o.report.photos && !o.report.videos;
     o.report[kind]++;
-    var dst = await this.topicFor(o);
-    if (dst) {
-      var caption = '📦 ' + o.title + ' · №' + o.num + '\n' + o.items.join(', ') + '\n🚚 ' + u.name + ' · ' + dmhm(this.now()) + ' · точка ' + o.seq;
+    var when = dmhm(this.now());
+    var caption = first
+      ? '📦 ' + o.title + ' · заявка №' + o.num + '\n' + o.items.join(', ') + '\n🚚 ' + u.name + ' · ' + when
+      : '📦 ' + o.title + ' · №' + o.num + ' · ' + when;
+    var copy = async function (chat, thread) {
       try {
-        await this.tg.call('copyMessage', Object.assign({ chat_id: dst.chat, from_chat_id: msg.chat.id, message_id: msg.message_id, caption: caption.slice(0, 1000) },
-          dst.thread ? { message_thread_id: dst.thread } : {}));
-      } catch (e) { console.error('copy failed', String(e && e.message || e)); }
+        await this.tg.call('copyMessage', Object.assign({ chat_id: chat, from_chat_id: msg.chat.id, message_id: msg.message_id, caption: caption.slice(0, 1000) },
+          thread ? { message_thread_id: thread } : {}));
+      } catch (e) { console.error('copy failed', chat, String(e && e.message || e)); }
+    }.bind(this);
+    var dst = await this.topicFor(o);
+    if (dst) await copy(dst.chat, dst.thread);
+    // заказчику
+    var p = await this.s.get('project:' + o.projectId);
+    var clients = (p && p.clients) || [];
+    for (var ci = 0; ci < clients.length; ci++) await copy(clients[ci].id);
+    // в архив (облако)
+    if (this.opts.archive) {
+      var file = msg.photo ? msg.photo[msg.photo.length - 1] : (msg.video || msg.video_note || msg.document);
+      var d = new Date(this.now());
+      var day = d.toLocaleDateString('sv-SE', { timeZone: TZ });
+      var hm = hhmm(this.now()).replace(':', '-');
+      var base = (p ? p.id : o.projectId) + '/' + day + '/N' + String(o.num).replace(/[^\w-]/g, '_') + '_' + hm + '_' + (kind === 'photos' ? 'foto' : 'video') + o.report[kind];
+      try {
+        var key = await this.opts.archive(file && file.file_id, base);
+        if (key) { o.report.files = (o.report.files || []).concat(key).slice(-50); }
+      } catch (e) {
+        console.error('archive failed', String(e && e.message || e));
+        o.report.archiveErrors = (o.report.archiveErrors || 0) + 1;
+      }
     }
     if (o.report.photos >= 1 && o.report.videos >= 1) {
       o.status = 'delivered'; o.deliveredAt = this.now(); o.closedAt = o.deliveredAt;
       await this.s.put('order:' + o.id, o);
       await this.s.del('pending:' + from);
-      await this.send(from, '✅ Точка ' + o.seq + ' закрыта: ' + esc(o.title));
+      await this.send(from, '✅ Точка ' + o.seq + ' закрыта: ' + esc(o.title) + ' · №' + esc(o.num));
+      await this.toClients(o, '✅ <b>Доставлено</b>: заявка №' + esc(o.num) + ' · ' + esc(o.title) + ' · ' + hhmm(o.deliveredAt) + '. Фото и видео выгрузки — выше.');
       await this.afterClose(u, o);
     } else {
       await this.s.put('order:' + o.id, o);
@@ -466,6 +585,13 @@
     if (!msg || !msg.from) return;
     var text = (msg.text || '').trim();
     var isPrivate = msg.chat.type === 'private';
+    var who = [msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || msg.from.username || String(msg.from.id);
+    var sub = /^\/start(?:@\w+)?\s+c_([a-z0-9]+)$/.exec(text);
+    if (sub) return this.subscribe(msg.chat, sub[1], who);
+    if (/^\/stop(@\w+)?$/.test(text)) {
+      var me = isPrivate ? await this.user(String(msg.from.id)) : null;
+      if (!me || (me.role !== 'admin' && me.role !== 'courier')) return this.unsubscribe(msg.chat);
+    }
     if (!isPrivate) {
       if (/^\/reports(@\w+)?$/.test(text)) {
         var a = await this.user(String(msg.from.id));
@@ -512,7 +638,10 @@
     if (!c || c.role !== 'courier') fail('Курьер не найден', 404);
     if (d.name != null && clean(d.name, 60)) c.name = clean(d.name, 60);
     if (d.vehicle != null) c.vehicle = clean(d.vehicle, 60);
+    if (d.plate != null) c.plate = clean(d.plate, 20).toUpperCase();
+    if (d.phone != null) c.phone = clean(d.phone, 30);
     await this.s.put('user:' + c.id, c);
+    await this.refreshPasses(c);
     return c;
   };
 
@@ -532,6 +661,7 @@
       case 'problem': return this.problem(u, body.orderId, body.reason, body.comment);
       case 'setRole': return this.setRole(u.id, body.id, body.role);
       case 'updateCourier': return this.updateCourier(u, body.id, body);
+      case 'myCar': return this.myCar(u, body);
     }
     fail('Неизвестное действие');
   };

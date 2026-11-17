@@ -72,10 +72,40 @@ function header(event, name) {
   return key ? h[key] : '';
 }
 
-module.exports.handler = async function (event) {
+/**
+ * Архив отчётов: файл из Telegram → приватный бакет Object Storage.
+ * Авторизация — IAM-токеном сервисного аккаунта функции (context.token), ключи не нужны.
+ * Bot API отдаёт файлы до 20 МБ; обычное видео из Telegram (сжатое) в это укладывается.
+ */
+function makeArchive(context) {
+  const bucket = process.env.ARCHIVE_BUCKET;
+  const iam = context && context.token && context.token.access_token;
+  if (!bucket || !iam) return null;
+  return async function (fileId, base) {
+    if (!fileId) return null;
+    const f = await tg.call('getFile', { file_id: fileId });
+    if (!f || !f.file_path) throw new Error('getFile: нет пути (файл больше 20 МБ?)');
+    const ext = (f.file_path.match(/\.(\w{2,5})$/) || [, 'bin'])[1].toLowerCase();
+    const res = await fetch('https://api.telegram.org/file/bot' + TOKEN + '/' + f.file_path, { signal: AbortSignal.timeout(20000) });
+    if (!res.ok) throw new Error('скачивание: ' + res.status);
+    const buf = Buffer.from(await res.arrayBuffer());
+    const key = base + '.' + ext;
+    const type = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', mp4: 'video/mp4', mov: 'video/quicktime' }[ext] || 'application/octet-stream';
+    const put = await fetch('https://storage.yandexcloud.net/' + bucket + '/' + key.split('/').map(encodeURIComponent).join('/'), {
+      method: 'PUT',
+      headers: { 'X-YaCloud-SubjectToken': iam, 'content-type': type },
+      body: buf,
+      signal: AbortSignal.timeout(20000)
+    });
+    if (!put.ok) throw new Error('загрузка в бакет: ' + put.status + ' ' + (await put.text()).slice(0, 200));
+    return key;
+  };
+}
+
+module.exports.handler = async function (event, context) {
   // API Gateway кладёт реальный путь в url, а шаблон из спецификации — в path
   const path = (event.url || event.path || '').split('?')[0];
-  const core = new Core(getStore(), tg, Date.now, { appUrl: APP_URL });
+  const core = new Core(getStore(), tg, Date.now, { appUrl: APP_URL, botUsername: process.env.BOT_USERNAME || '', archive: makeArchive(context) });
   try {
     if (path.startsWith('/tg/')) {
       const secret = (event.pathParams && event.pathParams.secret) || path.slice(4);
