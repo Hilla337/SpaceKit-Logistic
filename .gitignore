@@ -1,0 +1,4 @@
+node_modules/
+function/core.js
+web/core.js
+web/telegram-web-app.js

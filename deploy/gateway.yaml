@@ -1,0 +1,44 @@
+openapi: 3.0.0
+info:
+  title: sk-logistic
+  version: 1.0.0
+paths:
+  /:
+    get:
+      x-yc-apigateway-integration:
+        type: object_storage
+        bucket: __BUCKET__
+        object: index.html
+        service_account_id: __SA__
+  /{file}:
+    get:
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      x-yc-apigateway-integration:
+        type: object_storage
+        bucket: __BUCKET__
+        object: '{file}'
+        error_object: index.html
+        service_account_id: __SA__
+  /api:
+    post:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: __FN__
+        service_account_id: __SA__
+  /tg/{secret}:
+    post:
+      parameters:
+        - name: secret
+          in: path
+          required: true
+          schema:
+            type: string
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: __FN__
+        service_account_id: __SA__

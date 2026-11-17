@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>SpaceKit Logistic</title>
+<script src="telegram-web-app.js"></script>
+<script src="core.js"></script>
+<style>
+:root{
+  --bg:#0f1115;--card:#171a21;--card2:#1e222b;--line:#2a2f3a;--text:#eef0f4;--muted:#8b93a3;--dim:#5f6776;
+  --accent:#7c83ff;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input,textarea,select{font:inherit;color:var(--text);background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:72px}
+.wrap{max-width:720px;margin:0 auto;padding:14px 14px 0}
+header{position:sticky;top:0;z-index:5;background:rgba(15,17,21,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+header .wrap{display:flex;align-items:center;gap:10px;padding-top:10px;padding-bottom:10px}
+.logo{width:30px;height:30px;border-radius:8px;background:#fff;color:#111;font-weight:800;font-size:13px;display:grid;place-items:center;flex:none}
+.brand{font-weight:700;font-size:16px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who{font-size:12px;color:var(--muted);text-align:right}
+.demo{display:flex;gap:6px;overflow-x:auto;padding:8px 14px;border-bottom:1px solid var(--line);background:#191520;scrollbar-width:none}
+.demo b{font-size:12px;color:#f5c26b;align-self:center;white-space:nowrap;margin-right:4px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;background:var(--card2);border:1px solid var(--line);font-size:13px;white-space:nowrap}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.dot{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;color:#0b0d10;flex:none}
+h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:18px 2px 8px;display:flex;align-items:center;gap:8px}
+h2 .n{background:var(--accent);color:#fff;border-radius:999px;padding:0 7px;font-size:12px;letter-spacing:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.card.active{border-color:var(--ok);box-shadow:0 0 0 1px rgba(34,197,94,.25) inset}
+.card.prob{border-color:rgba(239,68,68,.6)}
+.row{display:flex;align-items:center;gap:10px}
+.sp{flex:1;min-width:0}
+.t{font-weight:700;font-size:16px}
+.s{color:var(--muted);font-size:13px}
+.xs{color:var(--dim);font-size:12px}
+.goods{background:var(--card2);border-radius:10px;padding:9px 11px;margin-top:10px;font-size:14px}
+.goods div+div{margin-top:3px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 14px;border-radius:12px;background:var(--card2);border:1px solid var(--line);font-weight:600;font-size:14px;min-height:46px}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#06240f}
+.btn.bad{color:#ffb4b4;border-color:rgba(239,68,68,.5)}
+.btn.sm{padding:7px 10px;min-height:34px;font-size:13px;border-radius:10px}
+.btn:disabled{opacity:.45}
+.btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.btns .btn{flex:1}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 9px;border-radius:999px;background:var(--card2);color:var(--muted);white-space:nowrap}
+.tag.ok{background:rgba(34,197,94,.14);color:#6ee7a0}
+.tag.warn{background:rgba(245,158,11,.14);color:#fcd27b}
+.tag.bad{background:rgba(239,68,68,.14);color:#fca5a5}
+.tag.acc{background:rgba(124,131,255,.16);color:#b9bdff}
+.bar{display:flex;gap:4px;margin:10px 0 4px}
+.bar i{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.bar i.ok{background:var(--ok)}.bar i.bad{background:var(--bad)}.bar i.cur{background:var(--warn)}
+.stop{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
+.stop:first-child{border-top:0}
+.num{width:24px;height:24px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font-size:12px;font-weight:700;flex:none;color:var(--muted)}
+.num.ok{background:var(--ok);color:#06240f}.num.bad{background:var(--bad);color:#fff}.num.cur{background:var(--warn);color:#241500}
+.mv{display:flex;flex-direction:column;gap:2px}
+.mv button{width:30px;height:22px;border-radius:6px;background:var(--card2);color:var(--muted);font-size:12px}
+.empty{color:var(--dim);text-align:center;padding:22px 10px;font-size:14px}
+nav{position:fixed;left:0;right:0;bottom:0;background:rgba(19,22,28,.96);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
+nav .wrap{display:flex;padding:6px 8px}
+nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px;border-radius:10px;font-size:11px;color:var(--muted);position:relative}
+nav button.on{color:var(--text);background:var(--card2)}
+nav svg{width:22px;height:22px}
+nav .badge{position:absolute;top:2px;right:calc(50% - 22px);background:var(--bad);color:#fff;font-size:10px;border-radius:999px;padding:0 5px;min-width:16px}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--card);width:100%;max-width:720px;border-radius:18px 18px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom));max-height:88vh;overflow:auto;border-top:1px solid var(--line)}
+.sheet h3{font-size:18px;margin-bottom:12px}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:12px;color:var(--muted);margin:0 0 5px 2px}
+.opt{display:block;width:100%;text-align:left;padding:13px 14px;border-radius:12px;background:var(--card2);border:1px solid var(--line);margin-bottom:8px}
+.opt.on{border-color:var(--accent)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom));background:#2b303c;color:#fff;padding:10px 14px;border-radius:12px;font-size:14px;z-index:30;max-width:90vw;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+.toast.err{background:#5a1f1f}
+.chat{background:#0c1a26;border:1px solid #1f3346;border-radius:var(--r);padding:10px;margin-top:10px}
+.chat .m{background:#182533;border-radius:12px;padding:8px 10px;margin:6px 0;font-size:13px;white-space:pre-wrap}
+.chat .m.me{background:#2b5278;margin-left:30px}
+.hero{padding:14px;border-radius:var(--r);background:linear-gradient(135deg,#1b2433,#171a21);border:1px solid var(--line);margin-bottom:10px}
+.load{opacity:.6;pointer-events:none}
+.sk{height:84px;border-radius:var(--r);background:linear-gradient(90deg,var(--card) 0,var(--card2) 50%,var(--card) 100%);background-size:200% 100%;animation:sk 1.2s infinite;margin-bottom:10px}
+@keyframes sk{to{background-position:-200% 0}}
+a{color:#a5aaff}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="logo">SK</div>
+  <div class="brand">SpaceKit Logistic</div>
+  <div class="who" id="who"></div>
+</div><div id="demobar"></div></header>
+<main class="wrap" id="app"><div class="sk"></div><div class="sk"></div><div class="sk"></div></main>
+<nav id="nav" hidden><div class="wrap" id="navin"></div></nav>
+<div id="layer"></div>
+
+<script>
+'use strict';
+var TG = window.Telegram && window.Telegram.WebApp;
+var INIT = TG && TG.initData;
+var DEMO = !INIT;
+var S = { data: null, tab: 'orders', demoAs: '1', busy: false, botLog: [] };
+var ICON = {
+  orders: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+  couriers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>',
+  history: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M16 11a3 3 0 100-6M21 20c0-2-1.5-3.6-3.5-4.4"/></svg>'
+};
+
+function $(id) { return document.getElementById(id); }
+function e(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function hhmm(t) { return t ? SKCore.hhmm(t) : ''; }
+function plural(n, a, b, c) { return SKCore.plural(n, a, b, c); }
+function haptic(kind) { try { TG && TG.HapticFeedback && (kind === 'ok' ? TG.HapticFeedback.notificationOccurred('success') : TG.HapticFeedback.impactOccurred('light')); } catch (x) {} }
+function toast(msg, err) {
+  var d = document.createElement('div'); d.className = 'toast' + (err ? ' err' : ''); d.textContent = msg;
+  document.body.appendChild(d); setTimeout(function () { d.remove(); }, err ? 4200 : 2400);
+}
+
+// ---------- связь с сервером ----------
+var demo = null;
+function demoInit() {
+  var log = S.botLog;
+  var tg = { call: async function (method, p) {
+    if (method === 'sendMessage' || method === 'copyMessage') log.push({ to: String(p.chat_id), text: p.text || ('📎 ' + (p.caption || 'медиа')), at: Date.now() });
+    if (method === 'createForumTopic') return { message_thread_id: Math.floor(Math.random() * 1000) };
+    return { message_id: log.length };
+  } };
+  var core = new SKCore.Core(SKCore.MemoryStore(), tg, Date.now, {});
+  demo = { core: core, seeded: seed(core) };
+}
+async function seed(core) {
+  var now = Date.now();
+  await core.session({ id: '1', name: 'Володя' });
+  var cs = [['2', 'Заир', 'Isuzu · 3 т'], ['3', 'Толя', 'Газель · 1,5 т'], ['4', 'Саша', 'Валдай · 2 т']];
+  for (var i = 0; i < cs.length; i++) {
+    await core.session({ id: cs[i][0], name: cs[i][1] });
+    await core.setRole('1', cs[i][0], 'courier');
+    await core.updateCourier({ role: 'admin' }, cs[i][0], { vehicle: cs[i][2] });
+  }
+  await core.session({ id: '5', name: 'Стас', username: 'stas_zakup' });
+  var v = await core.user('1');
+  var mk = function (t, a, it, w) { return core.createOrder(v, { title: t, address: a, items: it, window: w || '' }); };
+  var a1 = await mk('Дом, Опалиха', 'Красногорск, мкр. Опалиха, ул. Ольховая, 12', 'Профнастил С8 — 24 листа', 'до 12:00');
+  var a2 = await mk('Таунхаус, Строгино', 'Москва, ул. Кулакова, 20', 'Кладочная сетка — 12 шт', '11:00–13:00');
+  var a3 = await mk('ЖК «Изумрудные холмы»', 'Красногорск, ул. Заречная, 4', 'Клей плиточный Ceresit CM11 — 20 мешков', '');
+  await core.assign(v, a1.id, '2'); await core.assign(v, a2.id, '2'); await core.assign(v, a3.id, '2');
+  await core.sendTrip(v, '2');
+  var b1 = await mk('Офис, Сколково', 'Сколково, Большой бульвар, 42', 'Краска Tikkurila — 10 вёдер');
+  await core.assign(v, b1.id, '3');
+  var b2 = await mk('ЖК «Солнцево Парк»', 'Москва, ул. Производственная, 8', 'Ламинат 32 класс — 18 уп.\nПодложка — 3 рулона');
+  await core.assign(v, b2.id, '3');
+  await mk('Ремонт, Раменки', 'Москва, Мичуринский пр., 9', 'Гипсокартон — 30 листов', '');
+  await mk('ЖК «Левобережный»', 'Химки, ул. Молодёжная, 70', 'Ламинат 33 класс — 28 упаковок', '14:00–17:00');
+  await mk('Квартира, Крылатское', 'Москва, Осенний б-р, 7к2', 'Штукатурка Ротбанд — 30 мешков', '');
+  // Заир уже закрыл первую точку
+  await core.reportStart(await core.user('2'), a1.id);
+  await core.onUpdate({ message: { message_id: 1, from: { id: 2 }, chat: { id: 2, type: 'private' }, photo: [{}] } });
+  await core.onUpdate({ message: { message_id: 2, from: { id: 2 }, chat: { id: 2, type: 'private' }, video: {} } });
+  S.botLog.length = 0;
+}
+
+async function api(op, body) {
+  body = Object.assign({ op: op }, body || {});
+  if (DEMO) {
+    await demo.seeded;
+    var u = await demo.core.user(S.demoAs);
+    try { return await demo.core.op(u, body); } catch (x) { throw new Error(x.message); }
+  }
+  var res, d;
+  try {
+    res = await fetch('api', { method: 'POST', headers: { 'content-type': 'application/json', 'x-tg-init': INIT }, body: JSON.stringify(body) });
+    d = await res.json();
+  } catch (x) { throw new Error('Нет связи. Проверь интернет и попробуй ещё раз'); }
+  if (!d.ok) throw new Error(d.error || 'Ошибка');
+  return d.result;
+}
+
+async function load(quiet) {
+  try {
+    var st = await api('state');
+    S.data = st;
+    try { localStorage.setItem('sk_state', JSON.stringify(st)); } catch (x) {}
+    render();
+  } catch (x) {
+    if (!S.data) {
+      try { S.data = JSON.parse(localStorage.getItem('sk_state')); } catch (y) {}
+      if (S.data) { render(); toast('Нет связи — показываю последние данные', true); }
+      else $('app').innerHTML = '<div class="empty">' + e(x.message) + '<br><br><button class="btn" onclick="load()">Повторить</button></div>';
+    } else if (!quiet) toast(x.message, true);
+  }
+}
+
+async function act(op, body, okMsg) {
+  if (S.busy) return;
+  S.busy = true; document.body.classList.add('load');
+  try {
+    var r = await api(op, body);
+    haptic('ok');
+    if (okMsg) toast(okMsg);
+    closeSheet();
+    await load(true);
+    return r;
+  } catch (x) {
+    toast(x.message, true);
+  } finally { S.busy = false; document.body.classList.remove('load'); }
+}
+
+// ---------- общие куски ----------
+function byId(list, id) { for (var i = 0; i < (list || []).length; i++) if (list[i].id === id) return list[i]; return null; }
+function avatar(c, size) {
+  if (!c) return '';
+  return '<span class="dot" style="background:' + c.color + (size ? ';width:' + size + 'px;height:' + size + 'px;font-size:' + Math.round(size / 2.2) + 'px' : '') + '">' + e((c.name || '?')[0]) + '</span>';
+}
+function goods(o) { return '<div class="goods">' + o.items.map(function (x) { return '<div>' + e(x) + '</div>'; }).join('') + '</div>'; }
+function ordersOf(trip) { return trip.orderIds.map(function (id) { return byId(S.data.orders, id); }).filter(Boolean); }
+function bar(list) {
+  var cur = false;
+  return '<div class="bar">' + list.map(function (o) {
+    var c = o.status === 'delivered' ? 'ok' : o.status === 'problem' ? 'bad' : (!cur && o.status === 'active') ? (cur = true, 'cur') : '';
+    return '<i class="' + c + '"></i>';
+  }).join('') + '</div>';
+}
+function navLink(addr) { return 'https://yandex.ru/maps/?rtext=~' + encodeURIComponent(addr) + '&rtt=auto'; }
+function openNav(addr) {
+  var u = navLink(addr);
+  if (TG && TG.openLink) TG.openLink(u); else window.open(u, '_blank');
+}
+
+function render() {
+  var d = S.data; if (!d) return;
+  var me = d.me;
+  $('who').innerHTML = e(me.name) + '<br>' + (me.role === 'admin' ? 'склад' : me.role === 'courier' ? 'курьер' : '');
+  renderDemoBar();
+  if (me.role === 'admin') return renderAdmin();
+  if (me.role === 'courier') return renderCourier();
+  $('nav').hidden = true;
+  $('app').innerHTML = '<div class="hero"><div class="t">' + (me.role === 'pending' ? 'Запрос отправлен' : 'Нет доступа') + '</div><div class="s" style="margin-top:6px">' +
+    (me.role === 'pending' ? 'Володя получил уведомление. Как только он подтвердит, бот напишет тебе.' : 'Если это ошибка — напиши Володе.') + '</div></div>';
+}
+
+function renderDemoBar() {
+  if (!DEMO) return;
+  var who = [['1', 'Володя · склад'], ['2', 'Заир'], ['3', 'Толя'], ['4', 'Саша']];
+  $('demobar').innerHTML = '<div class="demo"><b>Демо</b>' + who.map(function (w) {
+    return '<button class="chip' + (S.demoAs === w[0] ? ' on' : '') + '" onclick="demoAs(\'' + w[0] + '\')">' + e(w[1]) + '</button>';
+  }).join('') + '</div>';
+}
+function demoAs(id) { S.demoAs = id; S.tab = id === '1' ? (S.tab === 'me' ? 'orders' : S.tab) : 'me'; window.scrollTo(0, 0); load(); }
+
+// ---------- склад (Володя) ----------
+function renderAdmin() {
+  var d = S.data;
+  var tabs = [['orders', 'Заявки'], ['couriers', 'Курьеры'], ['history', 'Итоги'], ['people', 'Люди']];
+  if (!byId(tabs.map(function (t) { return { id: t[0] }; }), S.tab)) S.tab = 'orders';
+  var newCount = d.orders.filter(function (o) { return o.status === 'new'; }).length;
+  var probCount = d.orders.filter(function (o) { return o.status === 'problem' && !o.seen; }).length;
+  $('nav').hidden = false;
+  $('navin').innerHTML = tabs.map(function (t) {
+    var b = t[0] === 'orders' && newCount ? newCount : t[0] === 'people' && d.pending.length ? d.pending.length : t[0] === 'history' && probCount ? probCount : 0;
+    return '<button class="' + (S.tab === t[0] ? 'on' : '') + '" onclick="go(\'' + t[0] + '\')">' + ICON[t[0]] + t[1] + (b ? '<span class="badge">' + b + '</span>' : '') + '</button>';
+  }).join('');
+  var html = '';
+  if (S.tab === 'orders') html = adminOrders();
+  if (S.tab === 'couriers') html = adminCouriers();
+  if (S.tab === 'history') html = adminHistory();
+  if (S.tab === 'people') html = adminPeople();
+  $('app').innerHTML = html;
+}
+function go(t) { S.tab = t; window.scrollTo(0, 0); render(); }
+
+function adminOrders() {
+  var d = S.data;
+  var list = d.orders.filter(function (o) { return o.status === 'new'; }).sort(function (a, b) { return b.createdAt - a.createdAt; });
+  var h = '<div class="row" style="margin-top:4px"><h2 class="sp" style="margin:6px 2px">Новые заявки <span class="n">' + list.length + '</span></h2>' +
+    '<button class="btn sm pri" onclick="newOrder()">+ Пришла заявка</button></div>';
+  if (!list.length) h += '<div class="card empty">Новых заявок нет. Всё разложено по рейсам 👌</div>';
+  list.forEach(function (o) {
+    var p = byId(d.projects, o.projectId);
+    var c = p && p.courierId ? byId(d.couriers, p.courierId) : null;
+    h += '<div class="card"><div class="row"><div class="sp"><div class="t">' + e(o.title) + '</div><div class="s">' + e(o.address) + '</div></div>' +
+      '<div class="xs" style="text-align:right">№' + e(o.num) + '<br>' + hhmm(o.createdAt) + '</div></div>' + goods(o) +
+      (o.window ? '<div class="xs" style="margin-top:8px">Окно клиента: ' + e(o.window) + '</div>' : '') +
+      '<div class="btns">' + (c
+        ? '<button class="btn ok" onclick="act(\'assign\',{orderId:\'' + o.id + '\',courierId:\'' + c.id + '\'},\'В рейс: ' + e(c.name) + '\')">' + avatar(c) + ' В рейс ' + e(c.name) + '</button><button class="btn sm" style="flex:0 0 auto" onclick="pickCourier(\'' + o.id + '\')">Другой</button>'
+        : '<button class="btn pri" onclick="pickCourier(\'' + o.id + '\')">Новый объект — выбрать курьера</button>') +
+      '<button class="btn sm" style="flex:0 0 auto" onclick="orderMenu(\'' + o.id + '\')">⋯</button></div>' +
+      (c ? '<div class="xs" style="margin-top:6px">' + e(c.name) + ' закреплён за этим объектом</div>' : '') + '</div>';
+  });
+  return h;
+}
+
+function adminCouriers() {
+  var d = S.data;
+  if (!d.couriers.length) return '<div class="card empty" style="margin-top:14px">Курьеров пока нет. Пусть каждый откроет бота и нажмёт /start — запросы появятся во вкладке «Люди».</div>';
+  var h = '<h2>Курьеры</h2>';
+  d.couriers.forEach(function (c) {
+    var active = d.trips.filter(function (t) { return t.courierId === c.id && t.status === 'sent'; })[0];
+    var forming = d.trips.filter(function (t) { return t.courierId === c.id && t.status === 'forming'; })[0];
+    h += '<div class="card' + (active ? ' active' : '') + '"><div class="row">' + avatar(c, 34) + '<div class="sp"><div class="t">' + e(c.name) + '</div><div class="s">' + e(c.vehicle || 'машина не указана') + '</div></div>';
+    if (active) {
+      var ao = ordersOf(active), done = ao.filter(function (o) { return o.status !== 'active'; }).length;
+      var cur = ao.filter(function (o) { return o.status === 'active'; })[0];
+      h += '<span class="tag ok">В рейсе · ' + done + ' из ' + ao.length + '</span></div>' + bar(ao) +
+        '<div class="xs">Выехал в ' + hhmm(active.sentAt) + (cur ? ' · сейчас: <b style="color:var(--text)">' + e(cur.title) + '</b>' : '') + '</div>' +
+        '<div style="margin-top:8px">' + ao.map(stopRow).join('') + '</div>';
+    } else h += '<span class="tag">На складе</span></div>';
+    h += '<div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)"><div class="row"><div class="sp xs" style="text-transform:uppercase;letter-spacing:.05em">' + (active ? 'Следующий рейс' : 'Рейс на погрузку') + '</div>' +
+      '<div class="xs">' + (forming ? forming.orderIds.length + ' ' + plural(forming.orderIds.length, 'точка', 'точки', 'точек') : 'пусто') + '</div></div>';
+    if (forming) {
+      var fo = ordersOf(forming);
+      h += '<div style="margin-top:6px">' + fo.map(function (o, i) {
+        return '<div class="stop"><span class="num">' + (i + 1) + '</span><div class="sp"><div style="font-weight:600">' + e(o.title) + '</div><div class="xs">' + e(o.items.join(', ')) + '</div></div>' +
+          '<div class="mv"><button onclick="act(\'move\',{orderId:\'' + o.id + '\',dir:-1})" ' + (i ? '' : 'disabled') + '>▲</button><button onclick="act(\'move\',{orderId:\'' + o.id + '\',dir:1})" ' + (i < fo.length - 1 ? '' : 'disabled') + '>▼</button></div>' +
+          '<button class="btn sm" onclick="act(\'unqueue\',{orderId:\'' + o.id + '\'},\'Вернул в новые\')" title="Убрать">✕</button></div>';
+      }).join('') + '</div>';
+      h += '<div class="xs" style="margin-top:6px">Грузить с конца: первым кладётся то, что выгружать последним.</div>';
+      h += '<div class="btns"><button class="btn ' + (active ? '' : 'pri') + '" ' + (active ? 'disabled' : '') + ' onclick="sendTrip(\'' + c.id + '\')">' +
+        (active ? 'Отправить можно, когда закроет текущий' : 'Отправить рейс · ' + fo.length + ' ' + plural(fo.length, 'точка', 'точки', 'точек')) + '</button></div>';
+    } else h += '<div class="xs" style="margin-top:6px">Новые заявки по его объектам попадут сюда.</div>';
+    h += '</div></div>';
+  });
+  return h;
+}
+function stopRow(o) {
+  var st = o.status === 'delivered' ? '<span class="tag ok">доставлено ' + hhmm(o.deliveredAt) + '</span>'
+    : o.status === 'problem' ? '<span class="tag bad">проблема</span>'
+    : o.report && (o.report.photos || o.report.videos) ? '<span class="tag warn">отчёт: ' + (o.report.photos ? 'фото ✓' : 'фото —') + ' ' + (o.report.videos ? 'видео ✓' : 'видео —') + '</span>' : '';
+  var cls = o.status === 'delivered' ? 'ok' : o.status === 'problem' ? 'bad' : '';
+  return '<div class="stop"><span class="num ' + cls + '">' + (o.seq || '') + '</span><div class="sp"><div style="font-weight:600">' + e(o.title) + '</div><div class="xs">' + e(o.address) + '</div>' +
+    (o.problem ? '<div class="xs" style="color:#fca5a5">' + e(o.problem.text) + (o.problem.comment ? ' — «' + e(o.problem.comment) + '»' : '') + '</div>' : '') + '</div>' + st + '</div>';
+}
+function sendTrip(cid) {
+  var c = byId(S.data.couriers, cid);
+  var t = S.data.trips.filter(function (x) { return x.courierId === cid && x.status === 'forming'; })[0];
+  if (!t) return;
+  var fo = ordersOf(t);
+  sheet('<h3>Отправить рейс ' + e(c.name) + '?</h3><div class="s" style="margin-bottom:10px">Курьер получит список в боте. Порядок объезда:</div>' +
+    fo.map(function (o, i) { return '<div class="stop"><span class="num">' + (i + 1) + '</span><div class="sp"><b>' + e(o.title) + '</b><div class="xs">' + e(o.address) + '</div></div></div>'; }).join('') +
+    '<div class="s" style="margin:12px 0 6px">Порядок погрузки (первым — в глубину кузова):</div>' +
+    fo.slice().reverse().map(function (o, i) { return '<div class="xs">' + (i + 1) + '. ' + e(o.title) + ': ' + e(o.items.join(', ')) + '</div>'; }).join('') +
+    '<div class="btns"><button class="btn" onclick="closeSheet()">Отмена</button><button class="btn pri" onclick="act(\'sendTrip\',{courierId:\'' + cid + '\'},\'Рейс отправлен\')">Отправить</button></div>');
+}
+
+function adminHistory() {
+  var d = S.data;
+  var closed = d.orders.filter(function (o) { return o.status === 'delivered' || o.status === 'problem'; }).sort(function (a, b) { return (b.closedAt || 0) - (a.closedAt || 0); });
+  var probs = closed.filter(function (o) { return o.status === 'problem'; });
+  var today = new Date().toDateString();
+  var del = closed.filter(function (o) { return o.status === 'delivered' && new Date(o.deliveredAt).toDateString() === today; }).length;
+  var h = '<div class="row" style="gap:8px;margin-top:14px">' +
+    '<div class="card sp" style="margin:0"><div class="xs">Доставлено сегодня</div><div class="t" style="font-size:24px">' + del + '</div></div>' +
+    '<div class="card sp" style="margin:0"><div class="xs">Проблем за неделю</div><div class="t" style="font-size:24px;color:' + (probs.length ? '#fca5a5' : 'inherit') + '">' + probs.length + '</div></div></div>';
+  if (!d.reportsChat) h += '<div class="card" style="margin-top:10px;border-color:rgba(245,158,11,.5)"><b>Группа для отчётов не подключена.</b><div class="s" style="margin-top:4px">Добавь бота в группу «SpaceKit · Доставки» админом, включи «Темы» и напиши в группе /reports.</div></div>';
+  h += '<h2>За неделю</h2>';
+  if (!closed.length) h += '<div class="card empty">Пока пусто</div>';
+  closed.slice(0, 60).forEach(function (o) {
+    var c = byId(d.couriers, o.courierId);
+    h += '<div class="card' + (o.status === 'problem' ? ' prob' : '') + '"><div class="row">' + avatar(c) + '<div class="sp"><div style="font-weight:700">' + e(o.title) + ' <span class="xs">№' + e(o.num) + '</span></div><div class="xs">' + e(o.items.join(', ')) + '</div></div>' +
+      (o.status === 'problem' ? '<span class="tag bad">проблема</span>' : '<span class="tag ok">' + SKCore.dmhm(o.deliveredAt) + '</span>') + '</div>' +
+      (o.problem ? '<div class="s" style="margin-top:8px;color:#fca5a5">' + e(o.problem.text) + (o.problem.comment ? ' — «' + e(o.problem.comment) + '»' : '') + '</div><div class="btns"><button class="btn sm" onclick="retry(\'' + o.id + '\')">Создать заявку заново</button></div>' : '') +
+      '</div>';
+  });
+  return h;
+}
+function retry(id) {
+  var o = byId(S.data.orders, id);
+  newOrder({ title: o.title, address: o.address, items: o.items.join('\n'), window: o.window, note: 'Повтор №' + o.num });
+}
+
+function adminPeople() {
+  var d = S.data;
+  var h = '';
+  if (d.pending.length) {
+    h += '<h2>Просят доступ <span class="n">' + d.pending.length + '</span></h2>';
+    d.pending.forEach(function (p) {
+      h += '<div class="card"><div class="t">' + e(p.name) + '</div><div class="xs">' + (p.username ? '@' + e(p.username) : 'ID ' + e(p.id)) + '</div><div class="btns">' +
+        '<button class="btn ok" onclick="act(\'setRole\',{id:\'' + p.id + '\',role:\'courier\'},\'Добавлен курьер\')">Курьер</button>' +
+        '<button class="btn" onclick="act(\'setRole\',{id:\'' + p.id + '\',role:\'admin\'},\'Добавлен на склад\')">Склад</button>' +
+        '<button class="btn bad" onclick="act(\'setRole\',{id:\'' + p.id + '\',role:\'deny\'},\'Отклонено\')">✕</button></div></div>';
+    });
+  }
+  h += '<h2>Курьеры</h2>';
+  if (!d.couriers.length) h += '<div class="card empty">Пока никого. Курьер открывает бота → /start, запрос появится здесь.</div>';
+  d.couriers.forEach(function (c) {
+    h += '<div class="card"><div class="row">' + avatar(c, 30) + '<div class="sp"><div style="font-weight:700">' + e(c.name) + '</div><div class="xs">' + e(c.vehicle || 'машина не указана') + '</div></div>' +
+      '<button class="btn sm" onclick="editCourier(\'' + c.id + '\')">Изменить</button></div></div>';
+  });
+  var pr = d.projects.filter(function (p) { return p.courierId; });
+  if (pr.length) {
+    h += '<h2>Закрепления за объектами</h2><div class="card">' + pr.map(function (p) {
+      var c = byId(d.couriers, p.courierId);
+      return '<div class="stop">' + avatar(c) + '<div class="sp"><div style="font-weight:600">' + e(p.name) + '</div><div class="xs">' + e(p.address) + '</div></div><span class="xs">' + e(c ? c.name : '') + '</span></div>';
+    }).join('') + '</div>';
+  }
+  return h;
+}
+function editCourier(id) {
+  var c = byId(S.data.couriers, id);
+  sheet('<h3>' + e(c.name) + '</h3><div class="field"><label>Имя</label><input id="cn" value="' + e(c.name) + '"></div>' +
+    '<div class="field"><label>Машина</label><input id="cv" value="' + e(c.vehicle) + '" placeholder="Газель · 1,5 т"></div>' +
+    '<div class="btns"><button class="btn bad" onclick="if(confirmRemove())act(\'setRole\',{id:\'' + id + '\',role:\'remove\'},\'Доступ убран\')">Убрать доступ</button>' +
+    '<button class="btn pri" onclick="act(\'updateCourier\',{id:\'' + id + '\',name:$(\'cn\').value,vehicle:$(\'cv\').value},\'Сохранено\')">Сохранить</button></div>');
+}
+function confirmRemove() { return window.__rm ? true : (window.__rm = true, toast('Нажми ещё раз, чтобы убрать доступ'), setTimeout(function () { window.__rm = false; }, 3000), false); }
+
+function newOrder(pre) {
+  pre = pre || {};
+  var known = S.data.projects.slice().sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+  sheet('<h3>Новая заявка</h3>' +
+    '<div class="field"><label>Объект</label><input id="ft" list="plist" value="' + e(pre.title) + '" placeholder="ЖК «Левобережный»" oninput="fillAddr()"><datalist id="plist">' +
+    known.map(function (p) { return '<option value="' + e(p.name) + '">'; }).join('') + '</datalist></div>' +
+    '<div class="field"><label>Адрес</label><input id="fa" value="' + e(pre.address) + '" placeholder="Химки, ул. Молодёжная, 70"></div>' +
+    '<div class="field"><label>Груз — каждая позиция с новой строки</label><textarea id="fi" placeholder="Ламинат 33 класс — 28 уп.">' + e(pre.items) + '</textarea></div>' +
+    '<div class="row" style="gap:8px"><div class="field sp"><label>Окно клиента</label><input id="fw" value="' + e(pre.window) + '" placeholder="до 14:00"></div>' +
+    '<div class="field sp"><label>№ заказа</label><input id="fn" placeholder="авто"></div></div>' +
+    '<div class="field"><label>Комментарий</label><input id="fc" value="' + e(pre.note) + '" placeholder="звонить прорабу Сергею"></div>' +
+    '<div class="btns"><button class="btn" onclick="closeSheet()">Отмена</button><button class="btn pri" onclick="saveOrder()">Добавить</button></div>');
+}
+function fillAddr() {
+  var p = S.data.projects.filter(function (x) { return x.name === $('ft').value; })[0];
+  if (p && !$('fa').value) $('fa').value = p.address;
+}
+function saveOrder() {
+  act('createOrder', { order: { title: $('ft').value, address: $('fa').value, items: $('fi').value, window: $('fw').value, num: $('fn').value, note: $('fc').value } }, 'Заявка добавлена');
+}
+function pickCourier(oid) {
+  var o = byId(S.data.orders, oid);
+  sheet('<h3>Кто везёт?</h3><div class="s" style="margin-bottom:12px">' + e(o.title) + ' — курьер закрепится за этим объектом, следующие заявки сюда подставятся сами.</div>' +
+    S.data.couriers.map(function (c) {
+      return '<button class="opt" onclick="act(\'assign\',{orderId:\'' + oid + '\',courierId:\'' + c.id + '\'},\'В рейс: ' + e(c.name) + '\')"><div class="row">' + avatar(c, 28) + '<div class="sp"><b>' + e(c.name) + '</b><div class="xs">' + e(c.vehicle) + '</div></div></div></button>';
+    }).join('') + (S.data.couriers.length ? '' : '<div class="empty">Нет курьеров</div>'));
+}
+function orderMenu(oid) {
+  var o = byId(S.data.orders, oid);
+  sheet('<h3>' + e(o.title) + '</h3><div class="s">' + e(o.address) + '</div>' + goods(o) + (o.note ? '<div class="s" style="margin-top:8px">' + e(o.note) + '</div>' : '') +
+    '<div class="btns"><button class="btn" onclick="openNav(\'' + e(o.address).replace(/'/g, '') + '\')">На карте</button><button class="btn bad" onclick="act(\'cancelOrder\',{orderId:\'' + oid + '\'},\'Заявка отменена\')">Отменить заявку</button></div>');
+}
+
+// ---------- курьер ----------
+function renderCourier() {
+  var d = S.data;
+  $('nav').hidden = true;
+  var active = d.trips.filter(function (t) { return t.status === 'sent'; })[0];
+  var forming = d.trips.filter(function (t) { return t.status === 'forming'; })[0];
+  var h = '';
+  if (!active) {
+    h += '<div class="hero" style="margin-top:6px"><div class="t">Рейса нет</div><div class="s" style="margin-top:4px">Ждёшь на складе. Когда Володя отправит рейс, бот пришлёт уведомление.</div></div>';
+  } else {
+    var list = ordersOf(active);
+    var cur = list.filter(function (o) { return o.status === 'active'; })[0];
+    var done = list.filter(function (o) { return o.status !== 'active'; }).length;
+    h += '<div class="row" style="margin:6px 2px 0"><div class="sp s">Рейс · закрыто <b style="color:var(--text)">' + done + ' из ' + list.length + '</b></div><div class="xs">выезд ' + hhmm(active.sentAt) + '</div></div>' + bar(list);
+    if (cur) {
+      var r = cur.report || { photos: 0, videos: 0 };
+      h += '<div class="card active" style="margin-top:10px"><div class="xs" style="color:var(--ok);font-weight:700;letter-spacing:.05em">ТОЧКА ' + cur.seq + (cur.window ? ' · ' + e(cur.window) : '') + '</div>' +
+        '<div class="t" style="font-size:20px;margin-top:4px">' + e(cur.title) + '</div><div class="s">' + e(cur.address) + '</div>' +
+        '<div class="xs" style="margin-top:10px">Выгрузить · заказ №' + e(cur.num) + '</div>' + goods(cur) + (cur.note ? '<div class="s" style="margin-top:8px">💬 ' + e(cur.note) + '</div>' : '') +
+        '<div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)"><div class="row"><b class="sp">Отчёт по точке</b><span class="xs" style="color:#fca5a5;font-weight:700">ОБЯЗАТЕЛЬНО</span></div>' +
+        '<div class="row" style="gap:8px;margin-top:8px"><span class="tag ' + (r.photos ? 'ok' : '') + '">📷 фото ' + (r.photos ? '✓ ' + r.photos : '—') + '</span><span class="tag ' + (r.videos ? 'ok' : '') + '">🎥 видео ' + (r.videos ? '✓ ' + r.videos : '—') + '</span></div></div>' +
+        '<div class="btns"><button class="btn" onclick="openNav(\'' + e(cur.address).replace(/'/g, '') + '\')">🧭 Навигатор</button><button class="btn ok" onclick="report(\'' + cur.id + '\')">📸 Отчёт в бот</button></div>' +
+        '<div class="btns" style="margin-top:8px"><button class="btn bad" onclick="problem(\'' + cur.id + '\')">⚠️ Проблема на точке</button></div>' +
+        '<div class="xs" style="margin-top:8px;text-align:center">Без фото и видео точку не закрыть. Следующая откроется после отчёта.</div></div>';
+      if (DEMO) h += '<button class="btn" style="width:100%;border-style:dashed;color:#b9bdff" onclick="demoMedia(\'' + cur.id + '\')">Демо: курьер прислал фото и видео в бота</button>';
+    }
+    var rest = list.filter(function (o) { return o !== cur; });
+    if (rest.length) {
+      h += '<h2>Остальные точки</h2><div class="card">' + rest.map(function (o) {
+        var lock = o.status === 'active';
+        return '<div class="stop"><span class="num ' + (o.status === 'delivered' ? 'ok' : o.status === 'problem' ? 'bad' : '') + '">' + o.seq + '</span><div class="sp"><div style="font-weight:600">' + e(o.title) + '</div><div class="xs">' +
+          (lock ? 'откроется после отчёта по точке ' + (cur ? cur.seq : '') : o.status === 'delivered' ? 'доставлено ' + hhmm(o.deliveredAt) : 'проблема: ' + e(o.problem && o.problem.text)) + '</div></div>' + (lock ? '🔒' : '') + '</div>';
+      }).join('') + '</div>';
+    }
+  }
+  if (forming && forming.orderIds.length) {
+    h += '<h2>Следующий рейс собирается</h2><div class="card">' + ordersOf(forming).map(function (o, i) {
+      return '<div class="stop"><span class="num">' + (i + 1) + '</span><div class="sp"><div style="font-weight:600">' + e(o.title) + '</div><div class="xs">' + e(o.items.join(', ')) + '</div></div></div>';
+    }).join('') + '<div class="xs" style="margin-top:6px">Володя отправит его, когда вернёшься.</div></div>';
+  }
+  if (DEMO) h += botChat();
+  $('app').innerHTML = h;
+}
+
+async function report(oid) {
+  var r = await act('reportStart', { orderId: oid });
+  if (!r) return;
+  if (DEMO) { toast('Бот попросил фото и видео — смотри чат ниже'); return; }
+  toast('Бот ждёт фото и видео в чате');
+  setTimeout(function () { try { TG.close(); } catch (x) {} }, 900);
+}
+function problem(oid) {
+  var P = S.data.problems;
+  sheet('<h3>Что случилось?</h3>' + Object.keys(P).map(function (k) {
+    return '<button class="opt" data-k="' + k + '" onclick="pickReason(this)">' + e(P[k]) + '</button>';
+  }).join('') + '<div class="field"><label>Комментарий (по желанию)</label><input id="pc" placeholder="Прораб не берёт трубку, ждал 20 минут"></div>' +
+    '<div class="s" style="margin-bottom:6px">Точка закроется как проблемная, Володя сразу получит уведомление. Груз остаётся в машине.</div>' +
+    '<div class="btns"><button class="btn" onclick="closeSheet()">Отмена</button><button class="btn bad" id="pgo" disabled onclick="act(\'problem\',{orderId:\'' + oid + '\',reason:window.__reason,comment:$(\'pc\').value},\'Володя предупреждён\')">Сообщить</button></div>');
+}
+function pickReason(b) {
+  document.querySelectorAll('.opt').forEach(function (x) { x.classList.remove('on'); });
+  b.classList.add('on'); window.__reason = b.getAttribute('data-k'); $('pgo').disabled = false;
+}
+
+// ---------- демо: имитация чата бота ----------
+async function demoMedia(oid) {
+  var o = byId(S.data.orders, oid);
+  if (!o.report) await demo.core.reportStart(await demo.core.user(S.demoAs), oid);
+  var me = Number(S.demoAs);
+  S.botLog.push({ to: S.demoAs, me: true, text: '📷 фото', at: Date.now() });
+  await demo.core.onUpdate({ message: { message_id: Date.now(), from: { id: me }, chat: { id: me, type: 'private' }, photo: [{}] } });
+  S.botLog.push({ to: S.demoAs, me: true, text: '🎥 видео 0:14', at: Date.now() });
+  await demo.core.onUpdate({ message: { message_id: Date.now() + 1, from: { id: me }, chat: { id: me, type: 'private' }, video: {} } });
+  haptic('ok');
+  load();
+}
+function botChat() {
+  var mine = S.botLog.filter(function (m) { return m.to === S.demoAs; }).slice(-6);
+  return '<h2>Чат с ботом (демо)</h2><div class="chat">' + (mine.length ? mine.map(function (m) {
+    return '<div class="m' + (m.me ? ' me' : '') + '">' + m.text.replace(/<\/?b>/g, '') + '</div>';
+  }).join('') : '<div class="xs" style="padding:6px">Здесь видно, что бот пишет курьеру</div>') + '</div>';
+}
+
+// ---------- шторка ----------
+function sheet(html) {
+  $('layer').innerHTML = '<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">' + html + '</div></div>';
+}
+function closeSheet() { $('layer').innerHTML = ''; }
+
+// ---------- старт ----------
+if (TG) { try { TG.ready(); TG.expand(); TG.setHeaderColor && TG.setHeaderColor('#0f1115'); TG.setBackgroundColor && TG.setBackgroundColor('#0f1115'); } catch (x) {} }
+if (DEMO) demoInit();
+load();
+setInterval(function () { if (!document.hidden && !$('layer').innerHTML) load(true); }, DEMO ? 4000 : 20000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) load(true); });
+</script>
+</body>
+</html>

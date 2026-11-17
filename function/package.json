@@ -1,0 +1,9 @@
+{
+  "name": "spacekit-logistic-function",
+  "private": true,
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "ydb-sdk": "^5.11.1"
+  }
+}

@@ -1,0 +1,141 @@
+name: Выкладка в Яндекс Облако
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: cd function && npm install --no-audit --no-fund
+      - run: node --test test/*.test.js
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      FOLDER: ${{ secrets.YC_FOLDER_ID }}
+      TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+      NAME: sk-logistic
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Проверка секретов
+        run: |
+          for v in YC_SA_KEY YC_FOLDER_ID TG_BOT_TOKEN; do
+            if [ -z "$(eval echo \${S_$v})" ]; then echo "::error::Не задан секрет $v (Settings → Secrets and variables → Actions)"; exit 1; fi
+          done
+        env:
+          S_YC_SA_KEY: ${{ secrets.YC_SA_KEY }}
+          S_YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+          S_TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+
+      - name: Установка yc
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i "$HOME/yc" -n
+          echo "$HOME/yc/bin" >> "$GITHUB_PATH"
+
+      - name: Вход в облако
+        env:
+          YC_SA_KEY: ${{ secrets.YC_SA_KEY }}
+        run: |
+          printf '%s' "$YC_SA_KEY" > "$RUNNER_TEMP/key.json"
+          yc config set service-account-key "$RUNNER_TEMP/key.json"
+          yc config set folder-id "$FOLDER"
+          SA=$(jq -r .service_account_id "$RUNNER_TEMP/key.json")
+          echo "SA=$SA" >> "$GITHUB_ENV"
+          echo "BUCKET=$NAME-$FOLDER" >> "$GITHUB_ENV"
+
+      - name: База YDB
+        run: |
+          yc ydb database get "$NAME" >/dev/null 2>&1 || yc ydb database create "$NAME" --serverless
+          for i in $(seq 1 30); do
+            ST=$(yc ydb database get "$NAME" --format json | jq -r .status)
+            [ "$ST" = "RUNNING" ] && break; echo "YDB: $ST"; sleep 10
+          done
+          EP=$(yc ydb database get "$NAME" --format json | jq -r .endpoint)
+          # grpcs://ydb.serverless.yandexcloud.net:2135/?database=/ru-central1/...
+          echo "YDB_ENDPOINT=${EP%%/?database=*}" >> "$GITHUB_ENV"
+          echo "YDB_DATABASE=${EP##*database=}" >> "$GITHUB_ENV"
+
+      - name: Хранилище для страницы
+        run: |
+          yc storage bucket get "$BUCKET" >/dev/null 2>&1 || yc storage bucket create --name "$BUCKET"
+
+      - name: Функция и шлюз
+        run: |
+          yc serverless function get "$NAME" >/dev/null 2>&1 || yc serverless function create --name "$NAME"
+          FN=$(yc serverless function get "$NAME" --format json | jq -r .id)
+          sed -e "s/__BUCKET__/$BUCKET/g" -e "s/__SA__/$SA/g" -e "s/__FN__/$FN/g" deploy/gateway.yaml > "$RUNNER_TEMP/gw.yaml"
+          if yc serverless api-gateway get "$NAME" >/dev/null 2>&1; then
+            yc serverless api-gateway update "$NAME" --spec "$RUNNER_TEMP/gw.yaml"
+          else
+            yc serverless api-gateway create --name "$NAME" --spec "$RUNNER_TEMP/gw.yaml"
+          fi
+          DOMAIN=$(yc serverless api-gateway get "$NAME" --format json | jq -r .domain)
+          echo "APP_URL=https://$DOMAIN/" >> "$GITHUB_ENV"
+          echo "FN=$FN" >> "$GITHUB_ENV"
+
+      - name: Код функции
+        run: |
+          cp shared/core.js function/core.js
+          mkdir -p "$RUNNER_TEMP/fn"
+          cp function/index.js function/core.js function/store.js function/package.json "$RUNNER_TEMP/fn/"
+          (cd "$RUNNER_TEMP/fn" && zip -qr ../fn.zip .)
+          # Яндекс сам установит зависимости из package.json
+          yc serverless function version create \
+            --function-name "$NAME" \
+            --runtime nodejs22 \
+            --entrypoint index.handler \
+            --memory 256m \
+            --execution-timeout 30s \
+            --service-account-id "$SA" \
+            --source-path "$RUNNER_TEMP/fn.zip" \
+            --environment "YDB_ENDPOINT=$YDB_ENDPOINT,YDB_DATABASE=$YDB_DATABASE,APP_URL=$APP_URL,TG_BOT_TOKEN=$TG_BOT_TOKEN"
+
+      - name: Страница приложения
+        run: |
+          cp shared/core.js web/core.js
+          curl -fsSL https://telegram.org/js/telegram-web-app.js -o web/telegram-web-app.js || echo "// telegram sdk недоступен" > web/telegram-web-app.js
+          for f in web/*; do
+            n=$(basename "$f")
+            case "$n" in
+              *.html) ct="text/html; charset=utf-8"; cc="no-cache" ;;
+              *.js) ct="application/javascript; charset=utf-8"; cc="no-cache" ;;
+              *.png) ct="image/png"; cc="public, max-age=86400" ;;
+              *.svg) ct="image/svg+xml"; cc="public, max-age=86400" ;;
+              *.webmanifest) ct="application/manifest+json"; cc="no-cache" ;;
+              *) ct="application/octet-stream"; cc="no-cache" ;;
+            esac
+            yc storage s3api put-object --bucket "$BUCKET" --key "$n" --body "$f" --content-type "$ct" --cache-control "$cc" >/dev/null
+            echo "загружен $n"
+          done
+
+      - name: Бот
+        run: |
+          SECRET=$(printf '%s' "hook:$TG_BOT_TOKEN" | sha256sum | cut -c1-32)
+          curl -fsS "https://api.telegram.org/bot$TG_BOT_TOKEN/setWebhook" \
+            -H 'content-type: application/json' \
+            -d "{\"url\":\"${APP_URL}tg/$SECRET\",\"allowed_updates\":[\"message\",\"callback_query\"],\"drop_pending_updates\":false}" | jq -c '{ok,description}'
+          curl -fsS "https://api.telegram.org/bot$TG_BOT_TOKEN/setChatMenuButton" \
+            -H 'content-type: application/json' \
+            -d "{\"menu_button\":{\"type\":\"web_app\",\"text\":\"Логистика\",\"web_app\":{\"url\":\"$APP_URL\"}}}" | jq -c '{ok,description}'
+          curl -fsS "https://api.telegram.org/bot$TG_BOT_TOKEN/setMyCommands" \
+            -H 'content-type: application/json' \
+            -d '{"commands":[{"command":"start","description":"Начать / запросить доступ"}]}' | jq -c '{ok}'
+
+      - name: Итог
+        run: |
+          echo "### Готово" >> "$GITHUB_STEP_SUMMARY"
+          echo "Приложение: $APP_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "Открывать через бота: кнопка «Логистика» в чате." >> "$GITHUB_STEP_SUMMARY"
