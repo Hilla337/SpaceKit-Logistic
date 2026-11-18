@@ -48,12 +48,30 @@ jobs:
       - name: Вход в облако
         env:
           YC_SA_KEY: ${{ secrets.YC_SA_KEY }}
+          YC_SA_ID: ${{ secrets.YC_SA_ID }}
         run: |
-          printf '%s' "$YC_SA_KEY" > "$RUNNER_TEMP/key.json"
-          if ! jq -e '.id and .service_account_id and .private_key' "$RUNNER_TEMP/key.json" >/dev/null 2>&1; then
-            echo "::error::YC_SA_KEY должен быть JSON-файлом авторизованного ключа целиком (начинается с { и содержит id, service_account_id, private_key). В консоли при создании ключа нажми «Скачать файл с ключами» и вставь содержимое этого файла."
-            exit 1
-          fi
+          printf '%s' "$YC_SA_KEY" > "$RUNNER_TEMP/key.raw"
+          # Принимаем оба вида: JSON-файл ключа целиком или текст ключа из консоли
+          # (строка «Yandex.Cloud SA Key ID <...>» + PRIVATE KEY) вместе с секретом YC_SA_ID.
+          python3 - "$RUNNER_TEMP/key.raw" "$RUNNER_TEMP/key.json" "$YC_SA_ID" <<'PY'
+          import json, re, sys
+          raw = open(sys.argv[1], encoding='utf-8').read().strip()
+          out, sa = sys.argv[2], sys.argv[3].strip()
+          try:
+              k = json.loads(raw)
+              assert k.get('id') and k.get('service_account_id') and k.get('private_key')
+          except Exception:
+              m = re.search(r'(PLEASE DO NOT REMOVE THIS LINE! Yandex\.Cloud SA Key ID <([\w-]+)>\s*-----BEGIN PRIVATE KEY-----.+?-----END PRIVATE KEY-----)', raw, re.S)
+              if not m:
+                  print('::error::В YC_SA_KEY не найден закрытый ключ. Нужен JSON-файл ключа или текст от строки «PLEASE DO NOT REMOVE THIS LINE!» до «-----END PRIVATE KEY-----».'); sys.exit(1)
+              if not sa:
+                  print('::error::Ключ в текстовом виде — добавь секрет YC_SA_ID: ID сервисного аккаунта github-deploy (консоль → Сервисные аккаунты → github-deploy, поле «Идентификатор»).'); sys.exit(1)
+              pub = re.search(r'-----BEGIN PUBLIC KEY-----.+?-----END PUBLIC KEY-----', raw, re.S)
+              k = {'id': m.group(2), 'service_account_id': sa, 'key_algorithm': 'RSA_2048',
+                   'public_key': pub.group(0) + '\n' if pub else '', 'private_key': m.group(1) + '\n'}
+          json.dump(k, open(out, 'w'))
+          PY
+          rm -f "$RUNNER_TEMP/key.raw"
           yc config set service-account-key "$RUNNER_TEMP/key.json"
           yc config set folder-id "$FOLDER"
           SA=$(jq -r .service_account_id "$RUNNER_TEMP/key.json")
