@@ -607,7 +607,7 @@
     if (/^\/start/.test(text)) {
       var ident = { id: String(msg.from.id), name: [msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || msg.from.username || String(msg.from.id), username: msg.from.username || null };
       var u = await this.session(ident);
-      if (u.role === 'admin') return this.send(u.id, 'Привет, ' + esc(u.name) + '! Ты на складе' + (u.owner ? ' (владелец)' : '') + '.\n\nЧтобы отчёты шли в группу: добавь меня в группу админом и напиши там /reports.', this.appButton());
+      if (u.role === 'admin') return this.send(u.id, 'Привет, ' + esc(u.name) + '! Ты на складе' + (u.owner ? ' (владелец)' : '') + '.\n\nОтчёты курьеров уходят заказчику объекта и в архив. Ссылку для заказчика — в карточке заявки.', this.appButton());
       if (u.role === 'courier') return this.send(u.id, 'Привет, ' + esc(u.name) + '! Рейсы и точки — в приложении.', this.appButton());
       if (u.role === 'pending') return this.send(u.id, 'Запрос отправлен Володе. Как только подтвердит — напишу.');
       return this.send(u.id, 'Доступа нет.');

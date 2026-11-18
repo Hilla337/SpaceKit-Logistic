@@ -365,7 +365,6 @@ function adminHistory() {
   var h = '<div class="row" style="gap:8px;margin-top:14px">' +
     '<div class="card sp" style="margin:0"><div class="xs">Доставлено сегодня</div><div class="t" style="font-size:24px">' + del + '</div></div>' +
     '<div class="card sp" style="margin:0"><div class="xs">Проблем за неделю</div><div class="t" style="font-size:24px;color:' + (probs.length ? '#fca5a5' : 'inherit') + '">' + probs.length + '</div></div></div>';
-  if (!d.reportsChat) h += '<div class="card" style="margin-top:10px;border-color:rgba(245,158,11,.5)"><b>Группа для отчётов не подключена.</b><div class="s" style="margin-top:4px">Добавь бота в группу «SpaceKit · Доставки» админом, включи «Темы» и напиши в группе /reports.</div></div>';
   h += '<h2>За неделю</h2>';
   if (!closed.length) h += '<div class="card empty">Пока пусто</div>';
   closed.slice(0, 60).forEach(function (o) {
