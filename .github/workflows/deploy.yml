@@ -35,10 +35,18 @@ jobs:
           for v in YC_SA_KEY YC_FOLDER_ID TG_BOT_TOKEN; do
             if [ -z "$(eval echo \${S_$v})" ]; then echo "::error::Не задан секрет $v (Settings → Secrets and variables → Actions)"; exit 1; fi
           done
+          TOKEN=$(printf '%s' "$S_TG_BOT_TOKEN" | tr -d '[:space:]')
+          if ! curl -fsS "https://api.telegram.org/bot$TOKEN/getMe" >/dev/null 2>&1; then
+            echo "::error::Telegram не принимает токен из TG_BOT_TOKEN. Возьми актуальный токен в @BotFather (/mybots → бот → API Token) и вставь его в секрет целиком, вида 1234567890:AA…"
+            exit 1
+          fi
         env:
           S_YC_SA_KEY: ${{ secrets.YC_SA_KEY }}
           S_YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
           S_TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+
+      - name: Токен без пробелов
+        run: echo "TG_BOT_TOKEN=$(printf '%s' "$TG_BOT_TOKEN" | tr -d '[:space:]')" >> "$GITHUB_ENV"
 
       - name: Установка yc
         run: |
