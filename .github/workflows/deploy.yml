@@ -57,12 +57,22 @@ jobs:
           import json, re, sys
           raw = open(sys.argv[1], encoding='utf-8').read().strip()
           out, sa = sys.argv[2], sys.argv[3].strip()
-          try:
-              k = json.loads(raw)
-              assert k.get('id') and k.get('service_account_id') and k.get('private_key')
-          except Exception:
+          k = None
+          for cand in (raw, raw[raw.find('{'):raw.rfind('}') + 1] if '{' in raw else ''):
+              try:
+                  c = json.loads(cand)
+                  if c.get('id') and c.get('service_account_id') and c.get('private_key'):
+                      k = c; break
+              except Exception:
+                  pass
+          if k is None:
+              raw = raw.replace('\\n', '\n').replace('\r', '')
               m = re.search(r'(PLEASE DO NOT REMOVE THIS LINE! Yandex\.Cloud SA Key ID <([\w-]+)>\s*-----BEGIN PRIVATE KEY-----.+?-----END PRIVATE KEY-----)', raw, re.S)
               if not m:
+                  # без содержимого ключа — только форма, чтобы понять, что вставлено
+                  shape = {'длина': len(raw), 'есть {': '{' in raw, 'есть PLEASE DO NOT REMOVE': 'PLEASE DO NOT REMOVE' in raw,
+                           'есть BEGIN PRIVATE KEY': 'BEGIN PRIVATE KEY' in raw, 'есть END PRIVATE KEY': 'END PRIVATE KEY' in raw, 'есть service_account_id': 'service_account_id' in raw}
+                  print('Что лежит в секрете:', shape)
                   print('::error::В YC_SA_KEY не найден закрытый ключ. Нужен JSON-файл ключа или текст от строки «PLEASE DO NOT REMOVE THIS LINE!» до «-----END PRIVATE KEY-----».'); sys.exit(1)
               if not sa:
                   print('::error::Ключ в текстовом виде — добавь секрет YC_SA_ID: ID сервисного аккаунта github-deploy (консоль → Сервисные аккаунты → github-deploy, поле «Идентификатор»).'); sys.exit(1)
